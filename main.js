@@ -67,7 +67,7 @@ const ARENA_LENGTH = 500;
 const BALL_RADIUS = 7;
 const PADDLE_WIDTH = 60;   // Increased from 50 for better edge coverage
 const PADDLE_HEIGHT = 70;  // Increased from 60 for better edge coverage
-const PADDLE_DEPTH = 5;
+const PADDLE_DEPTH = 7;    // Increased from 5 to make paddles thicker
 const BALL_SPEED = 180;
 const PADDLE_Z_MIN = ARENA_LENGTH / 2 - 40;
 const PADDLE_Z_MAX = ARENA_LENGTH / 2;
@@ -544,19 +544,19 @@ function updateOpponentPaddle() {
                 predictedY = Math.sign(ballVelocity.y) * (ARENA_HEIGHT / 2 - BALL_RADIUS) - (ballVelocity.y * remainingTime);
             }
             
-            // Difficulty scaling based on score difference
+            // Difficulty scaling based on score difference - Made Slightly Harder
             const playerAdvantage = Math.max(0, gameState.scores.player - gameState.scores.opponent);
-            const adaptiveDifficulty = Math.min(0.98, 0.7 + (playerAdvantage * 0.06)); // Increased base difficulty and scaling
+            const adaptiveDifficulty = Math.min(0.6, 0.35 + (playerAdvantage * 0.025)); // Slightly increased base, scaling, and cap
             
-            // Add subtle randomness based on confidence (less randomness at higher difficulties)
-            const randomErrorFactor = (1 - adaptiveDifficulty) * 4; // Reduced randomness from 6 to 4
+            // Add randomness based on confidence - Significantly Reduced Accuracy
+            const randomErrorFactor = (1 - adaptiveDifficulty) * 600; // Increased randomness multiplier from 12 to 20
             const errorX = (Math.random() - 0.5) * randomErrorFactor;
             const errorY = (Math.random() - 0.5) * randomErrorFactor;
             
             // Store high-confidence predictions to avoid jitter
             if (cappedTimeToReach < 60 && Math.abs(ballVelocity.z) > 1) {
-                // Update prediction with smoothing
-                const smoothFactor = 0.35; // Slightly reduced from 0.4 for faster reaction
+                // Update prediction with smoothing - Slightly Faster Reaction
+                const smoothFactor = 0.65; // Decreased from 0.7 for slightly faster reaction
                 opponentPaddle.userData.lastPrediction.x = 
                     opponentPaddle.userData.lastPrediction.x * (1 - smoothFactor) + 
                     (predictedX + errorX) * smoothFactor;
@@ -565,7 +565,7 @@ function updateOpponentPaddle() {
                     opponentPaddle.userData.lastPrediction.y * (1 - smoothFactor) + 
                     (predictedY + errorY) * smoothFactor;
                     
-                opponentPaddle.userData.predictionConfidence = Math.min(1, opponentPaddle.userData.predictionConfidence + 0.15); // Increased confidence gain
+                opponentPaddle.userData.predictionConfidence = Math.min(1, opponentPaddle.userData.predictionConfidence + 0.04); // Slightly increased confidence gain from 0.03
             } else {
                 // Low confidence in prediction
                 opponentPaddle.userData.predictionConfidence = Math.max(0, opponentPaddle.userData.predictionConfidence - 0.05);
@@ -575,11 +575,10 @@ function updateOpponentPaddle() {
             targetX = opponentPaddle.userData.lastPrediction.x;
             targetY = opponentPaddle.userData.lastPrediction.y;
             
-            // Add some advanced AI - intentionally aim slightly off-center to put spin on ball
-            if (adaptiveDifficulty > 0.8) { // Increased threshold for strategic aim
-                // Strategically target slightly off-center to add spin on return
-                targetX += (ball.position.x > 0 ? -1 : 1) * PADDLE_WIDTH * 0.25;
-            }
+            // --- REMOVED Strategic Aiming --- 
+            // if (adaptiveDifficulty > 0.8) { 
+            //     targetX += (ball.position.x > 0 ? -1 : 1) * PADDLE_WIDTH * 0.25;
+            // }
             
             // Ensure target is within bounds
             targetX = Math.max(-maxX, Math.min(maxX, targetX));
@@ -587,7 +586,7 @@ function updateOpponentPaddle() {
         } else {
             // Ball moving away - smoothly return to a neutral defensive position
             // Return to neutral position but maintain some tracking of ball's X position
-            targetX = ball.position.x * 0.3; // Increased tracking factor from 0.2
+            targetX = ball.position.x * 0.08; // Slightly increased tracking factor from 0.05
             targetY = Math.sin(Date.now() * 0.0005) * ARENA_HEIGHT * 0.1; // Subtle movement
             
             // Gradually lose prediction confidence
@@ -602,9 +601,9 @@ function updateOpponentPaddle() {
         opponentPaddle.userData.targetX = targetX;
         opponentPaddle.userData.targetY = targetY;
         
-        // Calculate base speed (increased at higher difficulty)
-        const skillBonus = Math.min(8, gameState.scores.player * 0.25); // Increased skill bonus from 6 to 8 and faster scaling
-        const baseMaxSpeed = 3.0 + skillBonus; // Increased base speed from 2.5 to 3.0
+        // Calculate base speed (increased at higher difficulty) - Slightly Increased Speed
+        const skillBonus = Math.min(2.5, gameState.scores.player * 0.07); // Slightly increased skill bonus cap and scaling
+        const baseMaxSpeed = 1.5 + skillBonus; // Slightly increased base speed from 1.2 to 1.5
         
         // Apply smooth acceleration with variable maxSpeed based on distance and confidence
         const distX = targetX - opponentPaddle.position.x;
@@ -615,8 +614,8 @@ function updateOpponentPaddle() {
         const dynamicMaxSpeed = Math.min(baseMaxSpeed, 
             baseMaxSpeed * (0.5 + 0.5 * Math.min(1, distTotal / 50)));
         
-        // Calculate acceleration based on distance
-        const accelFactor = 0.2; // Increased acceleration from 0.15
+        // Calculate acceleration based on distance - Slightly Increased Acceleration
+        const accelFactor = 0.06; // Slightly increased acceleration from 0.05
         const maxAccel = dynamicMaxSpeed * accelFactor;
         
         // Accelerate in X direction
@@ -627,8 +626,8 @@ function updateOpponentPaddle() {
         const accelY = Math.sign(distY) * Math.min(Math.abs(distY) * 0.1, maxAccel);
         opponentPaddle.userData.velocityY += accelY;
         
-        // Apply drag to velocities (more drag = smoother, less responsive)
-        const dragFactor = 0.07; // Reduced drag slightly from 0.08 for faster response
+        // Apply drag to velocities (more drag = smoother, less responsive) - Slightly Reduced Drag
+        const dragFactor = 0.14; // Slightly reduced drag from 0.15 for faster response
         opponentPaddle.userData.velocityX *= (1 - dragFactor);
         opponentPaddle.userData.velocityY *= (1 - dragFactor);
         
@@ -686,8 +685,12 @@ function updateOpponentPaddle() {
 function updateBall(deltaTime) {
     if (!gameState.started || gameState.over) return;
     
-    // Store previous position for trail effect
-    const prevPosition = ball.position.clone();
+    // Store previous position for collision detection and trail
+    if (!ball.userData.previousPosition) {
+        ball.userData.previousPosition = ball.position.clone();
+    } else {
+        ball.userData.previousPosition.copy(ball.position);
+    }
     
     // Update ball position based on velocity (no gravity in Pong)
     ball.position.x += ballVelocity.x * deltaTime;
@@ -695,7 +698,7 @@ function updateBall(deltaTime) {
     ball.position.z += ballVelocity.z * deltaTime;
     
     // Add trail effect
-    updateBallTrail(deltaTime, prevPosition);
+    updateBallTrail(deltaTime, ball.userData.previousPosition); // Pass previous position
     
     // Animate ball - make it spin
     ball.rotation.x += deltaTime * 2;
@@ -833,6 +836,9 @@ function startGame() {
     
     // Create background particles for gameplay
     createBackgroundParticles();
+    
+    // Hide cursor
+    document.body.classList.add('game-active');
     
     // Reset ball
     resetBall();
@@ -1031,6 +1037,9 @@ function animate(timestamp) {
 
 // Enhance start screen when document is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Ensure cursor is initially visible
+    document.body.classList.remove('game-active');
+
     // Set favicon (tab icon) - Create a favicon link element dynamically
     const faviconLink = document.createElement('link');
     faviconLink.rel = 'icon';
@@ -1587,15 +1596,20 @@ function checkArenaBoundaries() {
 }
 
 function checkPaddleCollisions() {
-    // Player paddle collision - added small buffer to improve edge collision detection
-    const paddleHitBuffer = 2; // Small extra buffer for more forgiving edge hits
+    // Ensure previousPosition is initialized
+    if (!ball.userData.previousPosition) return;
     
-    if (ball.position.z > playerPaddle.position.z - PADDLE_DEPTH / 2 - BALL_RADIUS &&
-        ball.position.z < playerPaddle.position.z &&
+    const paddleHitBuffer = 5; // Increased buffer from 2 to 5 for more forgiving edge hits
+    const playerPaddleZPlane = playerPaddle.position.z - PADDLE_DEPTH / 2 - BALL_RADIUS;
+    const opponentPaddleZPlane = opponentPaddle.position.z + PADDLE_DEPTH / 2 + BALL_RADIUS;
+
+    // Player paddle collision - Check if ball crossed the paddle plane
+    if (ballVelocity.z > 0 && // Moving towards player
+        ball.userData.previousPosition.z <= playerPaddleZPlane && // Was behind or on plane
+        ball.position.z > playerPaddleZPlane && // Is now in front of plane
         Math.abs(ball.position.x - playerPaddle.position.x) < PADDLE_WIDTH / 2 + BALL_RADIUS + paddleHitBuffer &&
-        Math.abs(ball.position.y - playerPaddle.position.y) < PADDLE_HEIGHT / 2 + BALL_RADIUS + paddleHitBuffer &&
-        ballVelocity.z > 0) {
-        
+        Math.abs(ball.position.y - playerPaddle.position.y) < PADDLE_HEIGHT / 2 + BALL_RADIUS + paddleHitBuffer) 
+    {
         // Bounce direction based on where ball hit the paddle
         const hitPositionX = (ball.position.x - playerPaddle.position.x) / (PADDLE_WIDTH / 2);
         const hitPositionY = (ball.position.y - playerPaddle.position.y) / (PADDLE_HEIGHT / 2);
@@ -1603,25 +1617,25 @@ function checkPaddleCollisions() {
         // Angle the ball based on where it hit the paddle
         ballVelocity.x = BALL_SPEED * 0.75 * hitPositionX;
         ballVelocity.y = BALL_SPEED * 0.75 * hitPositionY;
-        ballVelocity.z = -BALL_SPEED;
+        ballVelocity.z = -BALL_SPEED; // Reflect Z velocity
         
         // Normalize to maintain constant speed
         normalizeVelocity();
         
-        // Move ball slightly to prevent repeated collisions
-        ball.position.z = playerPaddle.position.z - PADDLE_DEPTH / 2 - BALL_RADIUS;
+        // Adjust ball position to be exactly on the collision plane to prevent tunneling back
+        ball.position.z = playerPaddleZPlane;
         
         // Add hit effects
         createHitEffect(ball.position.clone(), 0xff5500);
     }
     
-    // Opponent paddle collision
-    if (ball.position.z < opponentPaddle.position.z + PADDLE_DEPTH / 2 + BALL_RADIUS &&
-        ball.position.z > opponentPaddle.position.z &&
-        Math.abs(ball.position.x - opponentPaddle.position.x) < PADDLE_WIDTH / 2 + BALL_RADIUS &&
-        Math.abs(ball.position.y - opponentPaddle.position.y) < PADDLE_HEIGHT / 2 + BALL_RADIUS &&
-        ballVelocity.z < 0) {
-        
+    // Opponent paddle collision - Check if ball crossed the paddle plane
+    if (ballVelocity.z < 0 && // Moving towards opponent
+        ball.userData.previousPosition.z >= opponentPaddleZPlane && // Was in front or on plane
+        ball.position.z < opponentPaddleZPlane && // Is now behind plane
+        Math.abs(ball.position.x - opponentPaddle.position.x) < PADDLE_WIDTH / 2 + BALL_RADIUS + paddleHitBuffer &&
+        Math.abs(ball.position.y - opponentPaddle.position.y) < PADDLE_HEIGHT / 2 + BALL_RADIUS + paddleHitBuffer)
+    {
         // Bounce direction based on where ball hit the paddle
         const hitPositionX = (ball.position.x - opponentPaddle.position.x) / (PADDLE_WIDTH / 2);
         const hitPositionY = (ball.position.y - opponentPaddle.position.y) / (PADDLE_HEIGHT / 2);
@@ -1629,13 +1643,13 @@ function checkPaddleCollisions() {
         // Angle the ball based on where it hit the paddle
         ballVelocity.x = BALL_SPEED * 0.75 * hitPositionX;
         ballVelocity.y = BALL_SPEED * 0.75 * hitPositionY;
-        ballVelocity.z = BALL_SPEED;
+        ballVelocity.z = BALL_SPEED; // Reflect Z velocity
         
         // Normalize to maintain constant speed
         normalizeVelocity();
         
-        // Move ball slightly to prevent repeated collisions
-        ball.position.z = opponentPaddle.position.z + PADDLE_DEPTH / 2 + BALL_RADIUS;
+        // Adjust ball position to be exactly on the collision plane
+        ball.position.z = opponentPaddleZPlane;
         
         // Add hit effects
         createHitEffect(ball.position.clone(), 0x55ff00);
@@ -1738,7 +1752,8 @@ function normalizeVelocity() {
 
 function checkScoring() {
     // Player scores (ball goes past opponent)
-    if (ball.position.z < -ARENA_LENGTH / 2 - BALL_RADIUS * 8) {
+    // Reduce sensitivity for player scoring (easier for player)
+    if (ball.position.z < -ARENA_LENGTH / 2 - BALL_RADIUS * 2) { // Changed multiplier from 8 back to 2
         gameState.scores.player += 1;
         playerScoreElement.textContent = gameState.scores.player;
         
@@ -1749,7 +1764,8 @@ function checkScoring() {
     }
     
     // Opponent scores (ball goes past player)
-    if (ball.position.z > ARENA_LENGTH / 2 + BALL_RADIUS * 8) {
+    // Keep sensitivity high for opponent scoring (harder for player)
+    if (ball.position.z > ARENA_LENGTH / 2 + BALL_RADIUS * 8) { // Keep multiplier at 8
         gameState.scores.opponent += 1;
         opponentScoreElement.textContent = gameState.scores.opponent;
         
@@ -1798,6 +1814,9 @@ function createKevinityGameOverScreen() {
     
     // Hide background particles on game over
     hideBackgroundParticles();
+    
+    // Show cursor again
+    document.body.classList.remove('game-active');
     
     // Create enhanced game over screen
     const kevinityGameOverScreen = document.createElement('div');
@@ -1953,6 +1972,9 @@ function restartGame() {
     if (currentGameOverScreen) {
         currentGameOverScreen.style.display = 'none';
     }
+    
+    // Hide cursor again for the new game
+    document.body.classList.add('game-active');
     
     // Reset ball
     resetBall();
