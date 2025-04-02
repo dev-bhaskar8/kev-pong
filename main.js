@@ -249,37 +249,6 @@ function createArena() {
     const arenaEdges = new THREE.LineSegments(arenaGeometry, arenaMaterial);
     scene.add(arenaEdges);
     
-    // Add faint faces for better visual definition
-    const faceMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff8800,
-        transparent: true,
-        opacity: 0.03,
-        side: THREE.DoubleSide
-    });
-    
-    // Create subtle planes for each face
-    const faces = [
-        // Front and back
-        { pos: [0, 0, halfLength], rot: [0, 0, 0], dim: [ARENA_WIDTH, ARENA_HEIGHT] },
-        { pos: [0, 0, -halfLength], rot: [0, 0, 0], dim: [ARENA_WIDTH, ARENA_HEIGHT] },
-        
-        // Left and right
-        { pos: [halfWidth, 0, 0], rot: [0, Math.PI/2, 0], dim: [ARENA_LENGTH, ARENA_HEIGHT] },
-        { pos: [-halfWidth, 0, 0], rot: [0, Math.PI/2, 0], dim: [ARENA_LENGTH, ARENA_HEIGHT] },
-        
-        // Top and bottom
-        { pos: [0, halfHeight, 0], rot: [Math.PI/2, 0, 0], dim: [ARENA_WIDTH, ARENA_LENGTH] },
-        { pos: [0, -halfHeight, 0], rot: [Math.PI/2, 0, 0], dim: [ARENA_WIDTH, ARENA_LENGTH] }
-    ];
-    
-    faces.forEach(face => {
-        const planeGeometry = new THREE.PlaneGeometry(face.dim[0], face.dim[1]);
-        const plane = new THREE.Mesh(planeGeometry, faceMaterial);
-        plane.position.set(face.pos[0], face.pos[1], face.pos[2]);
-        plane.rotation.set(face.rot[0], face.rot[1], face.rot[2]);
-        scene.add(plane);
-    });
-    
     // Add center line - make it more visible
     const centerLineGeometry = new THREE.PlaneGeometry(ARENA_WIDTH, ARENA_HEIGHT);
     const centerLineMaterial = new THREE.MeshBasicMaterial({
@@ -291,33 +260,6 @@ function createArena() {
     const centerLine = new THREE.Mesh(centerLineGeometry, centerLineMaterial);
     centerLine.rotation.y = Math.PI / 2;
     scene.add(centerLine);
-    
-    // Add end zones for better visual structure
-    const endZoneGeometry = new THREE.PlaneGeometry(ARENA_WIDTH, ARENA_HEIGHT);
-    
-    // Player end zone
-    const playerEndMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff3300,
-        transparent: true,
-        opacity: 0.07,
-        side: THREE.DoubleSide
-    });
-    const playerEndZone = new THREE.Mesh(endZoneGeometry, playerEndMaterial);
-    playerEndZone.position.z = ARENA_LENGTH / 2;
-    playerEndZone.rotation.y = Math.PI / 2;
-    scene.add(playerEndZone);
-    
-    // Opponent end zone
-    const opponentEndMaterial = new THREE.MeshBasicMaterial({
-        color: 0x33ff00,
-        transparent: true,
-        opacity: 0.07,
-        side: THREE.DoubleSide
-    });
-    const opponentEndZone = new THREE.Mesh(endZoneGeometry, opponentEndMaterial);
-    opponentEndZone.position.z = -ARENA_LENGTH / 2;
-    opponentEndZone.rotation.y = Math.PI / 2;
-    scene.add(opponentEndZone);
     
     // Add horizontal guide lines to emphasize vertical space - make them cleaner
     const horizontalLines = [
