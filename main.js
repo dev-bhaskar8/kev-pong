@@ -83,7 +83,7 @@ let mousePosition = { x: 0, y: 0 };
 function init() {
     // Create Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a0500); // Dark orange-brown background
+    // scene.background = new THREE.Color(0x1a0500); // REMOVED: We'll set background on HTML body
 
     // Create Camera - adjust for more natural viewing angle
     camera = new THREE.PerspectiveCamera(
@@ -96,8 +96,9 @@ function init() {
     camera.lookAt(0, -40, 0); // Look slightly down to see more of the lower area
 
     // Create Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // Added alpha: true
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0); // Set clear color to transparent
     renderer.shadowMap.enabled = true;
     document.getElementById('game-container').appendChild(renderer.domElement);
 
@@ -322,125 +323,6 @@ function createArena() {
         lineMesh.scale.z = ARENA_LENGTH;
         scene.add(lineMesh);
     });
-    
-    // Add some decorative elements
-    // Floating particles - better distribute vertically
-    for (let i = 0; i < 160; i++) {
-        // Create different particle types for more visual interest
-        const particleType = Math.floor(Math.random() * 4); // 0-3 different types
-        let particleGeometry, particleMaterial;
-        
-        switch(particleType) {
-            case 0: // Glowing spheres
-                particleGeometry = new THREE.SphereGeometry(0.5 + Math.random() * 0.8, 8, 8);
-                particleMaterial = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color(
-                        0.9 + Math.random() * 0.1, 
-                        0.3 + Math.random() * 0.4, 
-                        0.0
-                    ),
-                    transparent: true,
-                    opacity: 0.3 + Math.random() * 0.5
-                });
-                break;
-                
-            case 1: // Small cubes
-                particleGeometry = new THREE.BoxGeometry(
-                    0.6 + Math.random() * 0.6, 
-                    0.6 + Math.random() * 0.6, 
-                    0.6 + Math.random() * 0.6
-                );
-                particleMaterial = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color(
-                        0.9, 
-                        0.6 + Math.random() * 0.2, 
-                        0.2 + Math.random() * 0.2
-                    ),
-                    transparent: true,
-                    opacity: 0.2 + Math.random() * 0.4,
-                    wireframe: Math.random() > 0.5
-                });
-                break;
-                
-            case 2: // Stars
-                particleGeometry = new THREE.OctahedronGeometry(0.6 + Math.random() * 0.7, 0);
-                particleMaterial = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color(
-                        1.0, 
-                        0.5 + Math.random() * 0.5, 
-                        0.2
-                    ),
-                    transparent: true,
-                    opacity: 0.3 + Math.random() * 0.4
-                });
-                break;
-                
-            case 3: // Elongated shapes
-                particleGeometry = new THREE.CylinderGeometry(
-                    0.2, 
-                    0.2, 
-                    1.0 + Math.random() * 2.0, 
-                    5, 
-                    1
-                );
-                particleMaterial = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color(
-                        1.0, 
-                        0.3 + Math.random() * 0.3, 
-                        0.0
-                    ),
-                    transparent: true,
-                    opacity: 0.2 + Math.random() * 0.3
-                });
-                break;
-        }
-        
-        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-        
-        // Random position within arena - better vertical distribution
-        particle.position.set(
-            (Math.random() - 0.5) * ARENA_WIDTH * 0.95,
-            (Math.random() - 0.5) * ARENA_HEIGHT * 0.95,
-            (Math.random() - 0.5) * ARENA_LENGTH * 0.95
-        );
-        
-        // Random initial rotation
-        particle.rotation.set(
-            Math.random() * Math.PI * 2,
-            Math.random() * Math.PI * 2,
-            Math.random() * Math.PI * 2
-        );
-        
-        // Store initial position and movement data - more varied movements
-        const movementType = Math.floor(Math.random() * 3); // 0-2 different movement types
-        
-        particle.userData = {
-            initialY: particle.position.y,
-            initialX: particle.position.x,
-            initialZ: particle.position.z,
-            speed: 0.05 + Math.random() * 0.25,
-            amplitude: 2 + Math.random() * 8, // Varied amplitude for particles
-            phase: Math.random() * Math.PI * 2,
-            phaseX: Math.random() * Math.PI * 2,
-            phaseZ: Math.random() * Math.PI * 2,
-            rotationSpeed: (Math.random() - 0.5) * 0.02,
-            movementType: movementType,
-            pulseSpeed: 0.5 + Math.random() * 1.5,
-            pulseMin: 0.6 + Math.random() * 0.2,
-            pulseMax: 1.0 + Math.random() * 0.5,
-            originalScale: 0.5 + Math.random() * 0.7
-        };
-        
-        // Apply initial scale
-        const scale = particle.userData.originalScale;
-        particle.scale.set(scale, scale, scale);
-        
-        scene.add(particle);
-        
-        // Store particles for animation
-        if (!scene.userData.particles) scene.userData.particles = [];
-        scene.userData.particles.push(particle);
-    }
 }
 
 function createBall() {
@@ -920,6 +802,9 @@ function startGame() {
         bottomLeftOverlay.style.display = 'block';
     }
     
+    // Create background particles for gameplay
+    createBackgroundParticles();
+    
     // Reset ball
     resetBall();
 }
@@ -988,84 +873,8 @@ function animate(timestamp) {
             });
         }
         
-        // Animate floating particles - limit processing for performance
-        if (scene.userData && scene.userData.particles) {
-            // Process a maximum number of particles per frame for performance
-            const MAX_PARTICLES_PER_FRAME = 50;
-            const particleCount = scene.userData.particles.length;
-            const processBatch = Math.min(particleCount, MAX_PARTICLES_PER_FRAME);
-            
-            // Process a subset of particles each frame
-            for (let i = 0; i < processBatch; i++) {
-                const index = Math.floor(Math.random() * particleCount);
-                const particle = scene.userData.particles[index];
-                
-                if (!particle || !particle.userData) continue;
-                
-                // Different movement patterns based on movement type
-                switch(particle.userData.movementType) {
-                    case 0: // Vertical floating with slight horizontal drift
-                        particle.position.y = particle.userData.initialY + 
-                            Math.sin(timestamp * 0.001 * particle.userData.speed + particle.userData.phase) * 
-                            particle.userData.amplitude;
-                        
-                        // Add slight horizontal drift
-                        particle.position.x = particle.userData.initialX + 
-                            Math.sin(timestamp * 0.0005 * particle.userData.speed + particle.userData.phaseX) * 
-                            (particle.userData.amplitude * 0.3);
-                        break;
-                        
-                    case 1: // Circular/orbital motion
-                        const circleX = Math.cos(timestamp * 0.0007 * particle.userData.speed + particle.userData.phaseX) * 
-                            particle.userData.amplitude;
-                        const circleZ = Math.sin(timestamp * 0.0007 * particle.userData.speed + particle.userData.phaseZ) * 
-                            particle.userData.amplitude;
-                        
-                        particle.position.x = particle.userData.initialX + circleX;
-                        particle.position.z = particle.userData.initialZ + circleZ;
-                        
-                        // Add slight vertical drift
-                        particle.position.y = particle.userData.initialY + 
-                            Math.sin(timestamp * 0.0005 * particle.userData.speed + particle.userData.phase) * 
-                            (particle.userData.amplitude * 0.5);
-                        break;
-                        
-                    case 2: // Complex 3D path
-                        particle.position.x = particle.userData.initialX + 
-                            Math.sin(timestamp * 0.0006 * particle.userData.speed + particle.userData.phaseX) * 
-                            particle.userData.amplitude;
-                        
-                        particle.position.y = particle.userData.initialY + 
-                            Math.sin(timestamp * 0.0008 * particle.userData.speed + particle.userData.phase) * 
-                            particle.userData.amplitude;
-                        
-                        particle.position.z = particle.userData.initialZ + 
-                            Math.sin(timestamp * 0.0004 * particle.userData.speed + particle.userData.phaseZ) * 
-                            particle.userData.amplitude;
-                        break;
-                }
-                
-                // Add rotation for all particles
-                particle.rotation.x += cappedDeltaTime * particle.userData.rotationSpeed * 2;
-                particle.rotation.y += cappedDeltaTime * particle.userData.rotationSpeed * 3;
-                particle.rotation.z += cappedDeltaTime * particle.userData.rotationSpeed * 1.5;
-                
-                // Pulse scale for added visual interest
-                const pulseValue = 
-                    particle.userData.pulseMin + 
-                    Math.sin(timestamp * 0.001 * particle.userData.pulseSpeed) * 
-                    (particle.userData.pulseMax - particle.userData.pulseMin) * 0.5;
-                    
-                const scaleBase = particle.userData.originalScale * pulseValue;
-                particle.scale.set(scaleBase, scaleBase, scaleBase);
-                
-                // Pulse opacity occasionally
-                if (particle.material && particle.material.opacity !== undefined) {
-                    particle.material.opacity = 
-                        0.2 + (0.4 * Math.sin(timestamp * 0.0005 * particle.userData.speed + particle.userData.phase));
-                }
-            }
-        }
+        // --- REMOVED 3D PARTICLE ANIMATION --- 
+        // No longer animating 3D particles
         
         // Limit hit particle processing for performance
         const MAX_HIT_PARTICLES = 100;
@@ -1224,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add title with glow effect
     const titleElement = document.createElement('h1');
-    titleElement.innerText = 'KEVINITY PONG';
+    titleElement.innerText = 'Kev\'s Pong'; // Changed from KEVINITY PONG
     titleElement.style.fontSize = '72px';
     titleElement.style.fontWeight = 'bold';
     titleElement.style.marginBottom = '10px';
@@ -1936,6 +1745,9 @@ function createKevinityGameOverScreen() {
         scoreContainer.setAttribute('style', 'display: none !important');
     }
     
+    // Hide background particles on game over
+    hideBackgroundParticles();
+    
     // Create enhanced game over screen
     const kevinityGameOverScreen = document.createElement('div');
     kevinityGameOverScreen.id = 'game-over-screen';
@@ -2093,6 +1905,50 @@ function restartGame() {
     
     // Reset ball
     resetBall();
+}
+
+// Function to create and manage background particles during gameplay
+function createBackgroundParticles() {
+    const container = document.getElementById('background-particles-container');
+    if (!container) return;
+    
+    // Ensure container is visible
+    container.style.display = 'block';
+    
+    // Clear existing particles if any
+    container.innerHTML = '';
+    
+    // Create particles
+    const particleCount = 30; // Number of particles
+    for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'background-particle';
+        
+        const size = 4 + Math.random() * 8; // Size: 4px to 12px
+        particle.style.width = size + 'px';
+        particle.style.height = size + 'px';
+        
+        // Random orange/yellowish color
+        particle.style.backgroundColor = `rgba(255, ${100 + Math.floor(Math.random() * 155)}, 0, ${0.2 + Math.random() * 0.5})`;
+        
+        // Random position
+        particle.style.top = Math.random() * 100 + '%';
+        particle.style.left = Math.random() * 100 + '%';
+        
+        // Random animation delay and duration
+        particle.style.animationDelay = Math.random() * 8 + 's';
+        particle.style.animationDuration = (8 + Math.random() * 10) + 's';
+        
+        container.appendChild(particle);
+    }
+}
+
+// Function to stop/hide background particles
+function hideBackgroundParticles() {
+    const container = document.getElementById('background-particles-container');
+    if (container) {
+        container.style.display = 'none';
+    }
 }
 
 // Start the game

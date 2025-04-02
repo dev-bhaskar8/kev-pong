@@ -3,9 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kevinity Pong</title>
+    <title>Kev's Pong</title>
     <link rel="stylesheet" href="style.css">
     <style>
+        /* Set background on body */
+        body {
+            background-color: #1a0500; /* Dark orange-brown background */
+            margin: 0;
+            overflow: hidden;
+        }
+        
         /* Additional styles to ensure overlay visibility */
         .bottom-left-overlay {
             position: fixed !important; /* Use fixed instead of absolute for better overlay positioning */
@@ -113,7 +120,7 @@
             position: absolute;
             top: 0;
             left: 0;
-            z-index: 1;
+            z-index: 1; /* Canvas above background particles */
         }
         
         /* Make sure score container appears above canvas */
@@ -136,6 +143,36 @@
             min-width: 120px !important;
             box-shadow: 0 0 15px rgba(255, 102, 0, 0.5) !important;
         }
+        
+        /* Style for the background particle container */
+        #background-particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Place it behind the canvas (z-index: 1) but above body */
+            overflow: hidden;
+            pointer-events: none;
+            display: none; /* Hidden by default, shown during gameplay */
+        }
+        
+        /* Style for individual background particles (copied from start screen) */
+        .background-particle {
+            position: absolute;
+            border-radius: 50%;
+            animation: floatParticleBackground 8s infinite ease-in-out;
+            /* z-index handled by container */
+        }
+        
+        /* Background particle animation */
+        @keyframes floatParticleBackground {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 0.5; } 
+            25% { transform: translate(-30px, 30px) rotate(90deg); opacity: 0.8; } 
+            50% { transform: translate(30px, 60px) rotate(180deg); opacity: 1; } 
+            75% { transform: translate(60px, 30px) rotate(270deg); opacity: 0.8; } 
+            100% { transform: translate(0, 0) rotate(360deg); opacity: 0.5; } 
+        }
     </style>
 </head>
 <body>
@@ -156,6 +193,9 @@
             <div id="game-result"></div>
             <button id="restart-button">Play Again</button>
         </div>
+        
+        <!-- Add a container for the 2D background particles -->
+        <div id="background-particles-container"></div>
         
         <!-- Always visible Kev image overlay in bottom left -->
         <div class="bottom-left-overlay">
