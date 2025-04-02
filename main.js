@@ -896,8 +896,14 @@ function startGame() {
     // Hide cursor
     document.body.classList.add('game-active');
     
-    // Reset ball
+    // Reset ball (defaults to serving opponent first)
     resetBall();
+
+    // Set flag for AI's first hit on initial serve
+    if (opponentPaddle.userData) {
+        opponentPaddle.userData.isFirstHitAfterServe = true;
+        console.log("INFO (startGame): Setting isFirstHitAfterServe = true"); // DIAGNOSTIC
+    }
 }
 
 function onWindowResize() {
