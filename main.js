@@ -7,6 +7,7 @@ const gameState = {
         opponent: 0
     },
     winningScore: 11,
+    currentBallSpeed: 0, // Added to track dynamic speed
     countdown: {
         active: false,
         value: 3,
@@ -471,14 +472,39 @@ function updateOpponentPaddle() {
             console.warn("updateOpponentPaddle called with missing objects");
             return; // Exit early if critical objects are missing
         }
-        if (!opponentPaddle.userData || !opponentPaddle.userData.lastPrediction || typeof opponentPaddle.userData.lastPrediction.x === 'undefined' || typeof opponentPaddle.userData.lastPrediction.y === 'undefined') {
-            // Ensure userData and lastPrediction are initialized if somehow missing or incomplete
+
+        // Ensure userData object exists
+        if (!opponentPaddle.userData) {
+            console.warn("Initializing opponentPaddle.userData");
             opponentPaddle.userData = {
                 velocityX: 0, velocityY: 0, targetX: 0, targetY: 0,
-                lastPrediction: { x: 0, y: 0 }, predictionConfidence: 0
+                lastPrediction: { x: 0, y: 0 }, predictionConfidence: 0,
+                isFirstHitAfterServe: false // Initialize flag only here
             };
-            console.warn("Re-initialized missing or incomplete opponentPaddle.userData");
         }
+        
+        // Ensure lastPrediction object exists
+        if (!opponentPaddle.userData.lastPrediction) {
+             console.warn("Initializing opponentPaddle.userData.lastPrediction");
+            opponentPaddle.userData.lastPrediction = { x: 0, y: 0 };
+        }
+        // Ensure lastPrediction properties exist
+        if (typeof opponentPaddle.userData.lastPrediction.x === 'undefined') {
+             console.warn("Initializing opponentPaddle.userData.lastPrediction.x");
+            opponentPaddle.userData.lastPrediction.x = 0;
+        }
+        if (typeof opponentPaddle.userData.lastPrediction.y === 'undefined') {
+             console.warn("Initializing opponentPaddle.userData.lastPrediction.y");
+            opponentPaddle.userData.lastPrediction.y = 0;
+        }
+        // Ensure other properties exist (add default if necessary, but preserve isFirstHitAfterServe)
+        if (typeof opponentPaddle.userData.velocityX === 'undefined') opponentPaddle.userData.velocityX = 0;
+        if (typeof opponentPaddle.userData.velocityY === 'undefined') opponentPaddle.userData.velocityY = 0;
+        if (typeof opponentPaddle.userData.targetX === 'undefined') opponentPaddle.userData.targetX = 0;
+        if (typeof opponentPaddle.userData.targetY === 'undefined') opponentPaddle.userData.targetY = 0;
+        if (typeof opponentPaddle.userData.predictionConfidence === 'undefined') opponentPaddle.userData.predictionConfidence = 0;
+        // Intentionally DO NOT reset isFirstHitAfterServe here unless userData itself was missing
+        
         // --- End Defensive Checks ---
 
         // Store previous position for smoothing
@@ -501,7 +527,8 @@ function updateOpponentPaddle() {
                 targetX: 0,
                 targetY: 0,
                 lastPrediction: { x: 0, y: 0 }, // Initialize lastPrediction with x and y
-                predictionConfidence: 0
+                predictionConfidence: 0,
+                isFirstHitAfterServe: false // Add flag for first hit accuracy
             };
         }
         
@@ -544,19 +571,27 @@ function updateOpponentPaddle() {
                 predictedY = Math.sign(ballVelocity.y) * (ARENA_HEIGHT / 2 - BALL_RADIUS) - (ballVelocity.y * remainingTime);
             }
             
+            // --- REMOVED isFirstHit definition from here --- 
+
             // Difficulty scaling based on score difference - Made Slightly Harder
             const playerAdvantage = Math.max(0, gameState.scores.player - gameState.scores.opponent);
             const adaptiveDifficulty = Math.min(0.6, 0.35 + (playerAdvantage * 0.025)); // Slightly increased base, scaling, and cap
             
             // Add randomness based on confidence - Significantly Reduced Accuracy
-            const randomErrorFactor = (1 - adaptiveDifficulty) * 600; // Increased randomness multiplier from 12 to 20
+            // --- BUT: No randomness on the first guaranteed hit --- 
+            // --- AND: Accuracy NO LONGER degrades with consecutive hits --- 
+            const baseRandomness = opponentPaddle.userData.isFirstHitAfterServe ? 0 : (1 - adaptiveDifficulty) * 400; // Directly use the flag here
+            // const consecutiveHitPenalty = Math.min(900, (opponentPaddle.userData.consecutiveHits || 0) * 50); // REMOVED
+            const randomErrorFactor = baseRandomness; // Simplified - no penalty added
+            
             const errorX = (Math.random() - 0.5) * randomErrorFactor;
             const errorY = (Math.random() - 0.5) * randomErrorFactor;
             
             // Store high-confidence predictions to avoid jitter
             if (cappedTimeToReach < 60 && Math.abs(ballVelocity.z) > 1) {
                 // Update prediction with smoothing - Slightly Faster Reaction
-                const smoothFactor = 0.65; // Decreased from 0.7 for slightly faster reaction
+                // --- BUT: Use less smoothing (more reactive) on the first guaranteed hit --- 
+                const smoothFactor = opponentPaddle.userData.isFirstHitAfterServe ? 0.1 : 0.65; // Decreased from 0.7 for slightly faster reaction
                 opponentPaddle.userData.lastPrediction.x = 
                     opponentPaddle.userData.lastPrediction.x * (1 - smoothFactor) + 
                     (predictedX + errorX) * smoothFactor;
@@ -565,7 +600,8 @@ function updateOpponentPaddle() {
                     opponentPaddle.userData.lastPrediction.y * (1 - smoothFactor) + 
                     (predictedY + errorY) * smoothFactor;
                     
-                opponentPaddle.userData.predictionConfidence = Math.min(1, opponentPaddle.userData.predictionConfidence + 0.04); // Slightly increased confidence gain from 0.03
+                // --- Set maximum confidence on the first hit --- 
+                opponentPaddle.userData.predictionConfidence = opponentPaddle.userData.isFirstHitAfterServe ? 1.0 : Math.min(1, opponentPaddle.userData.predictionConfidence + 0.04); // Slightly increased confidence gain from 0.03
             } else {
                 // Low confidence in prediction
                 opponentPaddle.userData.predictionConfidence = Math.max(0, opponentPaddle.userData.predictionConfidence - 0.05);
@@ -597,68 +633,84 @@ function updateOpponentPaddle() {
         targetX = isFinite(targetX) ? targetX : 0;
         targetY = isFinite(targetY) ? targetY : 0;
         
-        // Store current target
-        opponentPaddle.userData.targetX = targetX;
-        opponentPaddle.userData.targetY = targetY;
-        
-        // Calculate base speed (increased at higher difficulty) - Slightly Increased Speed
-        const skillBonus = Math.min(2.5, gameState.scores.player * 0.07); // Slightly increased skill bonus cap and scaling
-        const baseMaxSpeed = 1.5 + skillBonus; // Slightly increased base speed from 1.2 to 1.5
-        
-        // Apply smooth acceleration with variable maxSpeed based on distance and confidence
-        const distX = targetX - opponentPaddle.position.x;
-        const distY = targetY - opponentPaddle.position.y;
-        const distTotal = Math.sqrt(distX * distX + distY * distY);
-        
-        // Dynamic speed based on distance (faster when far from target)
-        const dynamicMaxSpeed = Math.min(baseMaxSpeed, 
-            baseMaxSpeed * (0.5 + 0.5 * Math.min(1, distTotal / 50)));
-        
-        // Calculate acceleration based on distance - Slightly Increased Acceleration
-        const accelFactor = 0.06; // Slightly increased acceleration from 0.05
-        const maxAccel = dynamicMaxSpeed * accelFactor;
-        
-        // Accelerate in X direction
-        const accelX = Math.sign(distX) * Math.min(Math.abs(distX) * 0.1, maxAccel);
-        opponentPaddle.userData.velocityX += accelX;
-        
-        // Accelerate in Y direction
-        const accelY = Math.sign(distY) * Math.min(Math.abs(distY) * 0.1, maxAccel);
-        opponentPaddle.userData.velocityY += accelY;
-        
-        // Apply drag to velocities (more drag = smoother, less responsive) - Slightly Reduced Drag
-        const dragFactor = 0.14; // Slightly reduced drag from 0.15 for faster response
-        opponentPaddle.userData.velocityX *= (1 - dragFactor);
-        opponentPaddle.userData.velocityY *= (1 - dragFactor);
-        
-        // Prevent NaN or Infinity in velocities
-        opponentPaddle.userData.velocityX = isFinite(opponentPaddle.userData.velocityX) ? 
-            opponentPaddle.userData.velocityX : 0;
-        opponentPaddle.userData.velocityY = isFinite(opponentPaddle.userData.velocityY) ? 
-            opponentPaddle.userData.velocityY : 0;
-        
-        // Cap at max speed
-        const currentSpeed = Math.sqrt(
-            opponentPaddle.userData.velocityX * opponentPaddle.userData.velocityX + 
-            opponentPaddle.userData.velocityY * opponentPaddle.userData.velocityY
-        );
-        
-        if (currentSpeed > dynamicMaxSpeed && currentSpeed > 0) {
-            const speedRatio = dynamicMaxSpeed / currentSpeed;
-            opponentPaddle.userData.velocityX *= speedRatio;
-            opponentPaddle.userData.velocityY *= speedRatio;
+        // --- Instant Move for First Hit --- 
+        if (opponentPaddle.userData.isFirstHitAfterServe) { // Directly use the flag here
+            console.log("DIAG: Teleporting opponent for first hit! Target:", targetX, targetY); // DIAGNOSTIC
+            opponentPaddle.position.x = targetX;
+            opponentPaddle.position.y = targetY;
+            // Ensure velocity is reset after teleport to avoid overshoot on next frame
+            opponentPaddle.userData.velocityX = 0;
+            opponentPaddle.userData.velocityY = 0;
+        } else {
+            // --- Normal Movement Logic (Only if not first hit) --- 
+            // Store current target
+            opponentPaddle.userData.targetX = targetX;
+            opponentPaddle.userData.targetY = targetY;
+            
+            // Calculate base speed - Massively faster for the first guaranteed hit
+            const skillBonus = Math.min(2.5, gameState.scores.player * 0.07); // Slightly increased skill bonus cap and scaling
+            const normalBaseMaxSpeed = 1.5 + skillBonus; // Slightly increased base speed from 1.2 to 1.5
+            // const baseMaxSpeed = isFirstHit ? 100.0 : normalBaseMaxSpeed; // No longer needed due to teleport
+            const baseMaxSpeed = normalBaseMaxSpeed; 
+            
+            // Apply smooth acceleration with variable maxSpeed based on distance and confidence
+            const distX = targetX - opponentPaddle.position.x;
+            const distY = targetY - opponentPaddle.position.y;
+            const distTotal = Math.sqrt(distX * distX + distY * distY);
+            
+            // Dynamic speed based on distance (faster when far from target)
+            // Use the potentially higher baseMaxSpeed for the first hit
+            const dynamicMaxSpeed = Math.min(baseMaxSpeed, 
+                baseMaxSpeed * (0.5 + 0.5 * Math.min(1, distTotal / 50)));
+            
+            // Calculate acceleration based on distance - Massively faster for first hit
+            const normalAccelFactor = 0.06; // Slightly increased acceleration from 0.05
+            // const accelFactor = isFirstHit ? 5.0 : normalAccelFactor; // No longer needed due to teleport
+            const accelFactor = normalAccelFactor; 
+            const maxAccel = dynamicMaxSpeed * accelFactor;
+            
+            // Accelerate in X direction
+            const accelX = Math.sign(distX) * Math.min(Math.abs(distX) * 0.1, maxAccel);
+            opponentPaddle.userData.velocityX += accelX;
+            
+            // Accelerate in Y direction
+            const accelY = Math.sign(distY) * Math.min(Math.abs(distY) * 0.1, maxAccel);
+            opponentPaddle.userData.velocityY += accelY;
+            
+            // Apply drag to velocities - Less drag for first hit
+            const normalDragFactor = 0.14; // Slightly reduced drag from 0.15 for faster response
+            // const dragFactor = isFirstHit ? 0.02 : normalDragFactor; // No longer needed due to teleport
+            const dragFactor = normalDragFactor; 
+            opponentPaddle.userData.velocityX *= (1 - dragFactor);
+            opponentPaddle.userData.velocityY *= (1 - dragFactor);
+            
+            // Prevent NaN or Infinity in velocities
+            opponentPaddle.userData.velocityX = isFinite(opponentPaddle.userData.velocityX) ? 
+                opponentPaddle.userData.velocityX : 0;
+            opponentPaddle.userData.velocityY = isFinite(opponentPaddle.userData.velocityY) ? 
+                opponentPaddle.userData.velocityY : 0;
+            
+            // Cap at max speed
+            const currentSpeed = Math.sqrt(
+                opponentPaddle.userData.velocityX * opponentPaddle.userData.velocityX + 
+                opponentPaddle.userData.velocityY * opponentPaddle.userData.velocityY
+            );
+            
+            if (currentSpeed > dynamicMaxSpeed && currentSpeed > 0) {
+                const speedRatio = dynamicMaxSpeed / currentSpeed;
+                opponentPaddle.userData.velocityX *= speedRatio;
+                opponentPaddle.userData.velocityY *= speedRatio;
+            }
+            
+            // Apply final velocity
+            opponentPaddle.position.x += opponentPaddle.userData.velocityX;
+            opponentPaddle.position.y += opponentPaddle.userData.velocityY;
         }
+        // --- End Movement Logic Branching ---
         
-        // Apply final velocity
-        opponentPaddle.position.x += opponentPaddle.userData.velocityX;
-        opponentPaddle.position.y += opponentPaddle.userData.velocityY;
-        
-        // Ensure position stays within boundaries
+        // Ensure position stays within boundaries (applies after teleport or movement)
         opponentPaddle.position.x = Math.max(-maxX, Math.min(maxX, opponentPaddle.position.x));
         opponentPaddle.position.y = Math.max(-maxY, Math.min(maxY, opponentPaddle.position.y));
-        
-        // Ensure Z position is always correct (to prevent disappearing)
-        opponentPaddle.position.z = -ARENA_LENGTH / 2 + 10;
     } catch (error) {
         console.error("Error in updateOpponentPaddle:", error);
         // Fallback to simple AI behavior if something goes wrong
@@ -775,21 +827,24 @@ function resetBall(serveToPlayer = false) {
         0
     );
     
+    // Reset current speed to base speed
+    gameState.currentBallSpeed = BALL_SPEED;
+
     // More vertical movement in initial direction
     const angleXY = Math.random() * Math.PI * 2;
-    const speedXY = BALL_SPEED * 0.6; // Increased from 0.5 for more XY movement
+    const speedXY = gameState.currentBallSpeed * 0.6; // Use currentBallSpeed
     
     ballVelocity.x = Math.cos(angleXY) * speedXY;
     ballVelocity.y = Math.sin(angleXY) * speedXY;
     
     // Z direction based on who to serve toward
     if (serveToPlayer) {
-        ballVelocity.z = BALL_SPEED * 0.8; // Towards player
+        ballVelocity.z = gameState.currentBallSpeed * 0.8; // Use currentBallSpeed
     } else {
-        ballVelocity.z = -BALL_SPEED * 0.8; // Towards opponent
+        ballVelocity.z = -gameState.currentBallSpeed * 0.8; // Use currentBallSpeed
     }
     
-    // Normalize to maintain constant speed
+    // Normalize to maintain constant speed (using currentBallSpeed)
     normalizeVelocity();
     
     // Create serve effect
@@ -801,6 +856,7 @@ function startGame() {
     gameState.over = false;
     gameState.scores.player = 0;
     gameState.scores.opponent = 0;
+    gameState.currentBallSpeed = BALL_SPEED; // Initialize ball speed
     
     // Update score display
     playerScoreElement.textContent = gameState.scores.player;
@@ -898,6 +954,12 @@ function animate(timestamp) {
                     
                     // Reset the ball with proper serve direction
                     resetBall(gameState.countdown.serveToPlayer);
+
+                    // If serving to opponent, set flag for first hit accuracy
+                    if (!gameState.countdown.serveToPlayer && opponentPaddle.userData) {
+                        opponentPaddle.userData.isFirstHitAfterServe = true;
+                        console.log("INFO: Setting isFirstHitAfterServe = true"); // DIAGNOSTIC
+                    }
                 }
             }
         }
@@ -1615,9 +1677,9 @@ function checkPaddleCollisions() {
         const hitPositionY = (ball.position.y - playerPaddle.position.y) / (PADDLE_HEIGHT / 2);
         
         // Angle the ball based on where it hit the paddle
-        ballVelocity.x = BALL_SPEED * 0.75 * hitPositionX;
-        ballVelocity.y = BALL_SPEED * 0.75 * hitPositionY;
-        ballVelocity.z = -BALL_SPEED; // Reflect Z velocity
+        ballVelocity.x = gameState.currentBallSpeed * 0.75 * hitPositionX;
+        ballVelocity.y = gameState.currentBallSpeed * 0.75 * hitPositionY;
+        ballVelocity.z = -gameState.currentBallSpeed; // Reflect Z velocity
         
         // Normalize to maintain constant speed
         normalizeVelocity();
@@ -1627,6 +1689,11 @@ function checkPaddleCollisions() {
         
         // Add hit effects
         createHitEffect(ball.position.clone(), 0xff5500);
+
+        // Increase ball speed slightly after hit
+        gameState.currentBallSpeed += 10; // Increased speed increment from 5 to 10
+        // Optional: Add a max speed cap
+        // gameState.currentBallSpeed = Math.min(gameState.currentBallSpeed, BALL_SPEED * 1.5); 
     }
     
     // Opponent paddle collision - Check if ball crossed the paddle plane
@@ -1641,9 +1708,9 @@ function checkPaddleCollisions() {
         const hitPositionY = (ball.position.y - opponentPaddle.position.y) / (PADDLE_HEIGHT / 2);
         
         // Angle the ball based on where it hit the paddle
-        ballVelocity.x = BALL_SPEED * 0.75 * hitPositionX;
-        ballVelocity.y = BALL_SPEED * 0.75 * hitPositionY;
-        ballVelocity.z = BALL_SPEED; // Reflect Z velocity
+        ballVelocity.x = gameState.currentBallSpeed * 0.75 * hitPositionX;
+        ballVelocity.y = gameState.currentBallSpeed * 0.75 * hitPositionY;
+        ballVelocity.z = gameState.currentBallSpeed; // Reflect Z velocity
         
         // Normalize to maintain constant speed
         normalizeVelocity();
@@ -1653,6 +1720,17 @@ function checkPaddleCollisions() {
         
         // Add hit effects
         createHitEffect(ball.position.clone(), 0x55ff00);
+
+        // Reset the first hit flag after the guaranteed hit
+        if (opponentPaddle.userData && opponentPaddle.userData.isFirstHitAfterServe) {
+            opponentPaddle.userData.isFirstHitAfterServe = false;
+            console.log("INFO: Resetting isFirstHitAfterServe to false after hit"); // DIAGNOSTIC
+        }
+
+        // Increase ball speed slightly after hit
+        gameState.currentBallSpeed += 10; // Increased speed increment from 5 to 10
+        // Optional: Add a max speed cap
+        // gameState.currentBallSpeed = Math.min(gameState.currentBallSpeed, BALL_SPEED * 1.5);
     }
 }
 
@@ -1745,9 +1823,11 @@ function normalizeVelocity() {
         ballVelocity.z * ballVelocity.z
     );
     
-    ballVelocity.x = (ballVelocity.x / speed) * BALL_SPEED;
-    ballVelocity.y = (ballVelocity.y / speed) * BALL_SPEED;
-    ballVelocity.z = (ballVelocity.z / speed) * BALL_SPEED;
+    if (speed === 0) return; // Avoid division by zero
+
+    ballVelocity.x = (ballVelocity.x / speed) * gameState.currentBallSpeed;
+    ballVelocity.y = (ballVelocity.y / speed) * gameState.currentBallSpeed;
+    ballVelocity.z = (ballVelocity.z / speed) * gameState.currentBallSpeed;
 }
 
 function checkScoring() {
@@ -1958,26 +2038,44 @@ function createKevinityGameOverScreen() {
 }
 
 function restartGame() {
-    // Reset game state
+    // Reset game state flags (but not scores immediately)
     gameState.over = false;
-    gameState.scores.player = 0;
-    gameState.scores.opponent = 0;
+    gameState.started = false; // Mark game as not started
+    // gameState.scores.player = 0; // Don't reset scores here
+    // gameState.scores.opponent = 0;
     
-    // Update score display
-    playerScoreElement.textContent = gameState.scores.player;
-    opponentScoreElement.textContent = gameState.scores.opponent;
+    // // Update score display // Don't update score display here
+    // playerScoreElement.textContent = gameState.scores.player;
+    // opponentScoreElement.textContent = gameState.scores.opponent;
     
     // Hide game over screen - get fresh reference to ensure we hide the enhanced version
     const currentGameOverScreen = document.getElementById('game-over-screen');
     if (currentGameOverScreen) {
         currentGameOverScreen.style.display = 'none';
     }
+
+    // Show start screen
+    const currentStartScreen = document.getElementById('start-screen');
+    if (currentStartScreen) {
+        currentStartScreen.style.display = 'flex'; // Use flex to match its original style
+    }
     
-    // Hide cursor again for the new game
-    document.body.classList.add('game-active');
+    // Ensure cursor is visible (should already be handled by game over screen)
+    document.body.classList.remove('game-active');
     
-    // Reset ball
-    resetBall();
+    // Ensure score and background particles are hidden (also handled by game over screen)
+    const scoreContainer = document.querySelector('.score-container');
+    if (scoreContainer) {
+        scoreContainer.setAttribute('style', 'display: none !important');
+    }
+    hideBackgroundParticles();
+
+    // No longer reset ball or hide cursor here
+    // // Hide cursor again for the new game
+    // document.body.classList.add('game-active');
+    // 
+    // // Reset ball
+    // resetBall();
 }
 
 // Function to create and manage background particles during gameplay
