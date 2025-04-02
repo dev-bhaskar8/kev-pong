@@ -92,7 +92,8 @@ function init() {
         0.1,
         1000
     );
-    camera.position.set(0, 80, 400); // Lower height to shift view upward
+    const baseZ = 400; // Define a base Z position
+    camera.position.set(0, 80, baseZ); // Use baseZ for initial position
     camera.lookAt(0, -40, 0); // Look slightly down to see more of the lower area
 
     // Create Renderer
@@ -120,11 +121,24 @@ function init() {
     // Enhance the HUD with Kevinity branding
     enhanceHUDWithKevinityBranding();
 
-    // Event listeners
+    // Event listeners (Only add listeners for elements that exist now)
+    // REMOVED: startButton.addEventListener('click', startGame); - Added later dynamically
+    // REMOVED: restartButton.addEventListener('click', restartGame); - Added later dynamically
+    // REMOVED: document.addEventListener('mousemove', onMouseMove); - Redundant, handled by onDocumentMouseMove
+    // REMOVED: window.addEventListener('resize', onWindowResize); - Duplicate below
+
+    // Add mouse move listener
+    document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+    // Add touch event listeners
+    document.addEventListener('touchstart', onDocumentTouchStart, { passive: false });
+    document.addEventListener('touchmove', onDocumentTouchMove, { passive: false });
+
+    // Add window resize listener
     window.addEventListener('resize', onWindowResize);
-    document.addEventListener('mousemove', onMouseMove);
-    startButton.addEventListener('click', startGame);
-    restartButton.addEventListener('click', restartGame);
+
+    // Call resize handler once initially to set camera based on initial aspect ratio
+    onWindowResize();
 
     // Start animation loop
     animate(0);
@@ -452,6 +466,21 @@ function updatePlayerPaddlePosition() {
 
 function updateOpponentPaddle() {
     try {
+        // --- Defensive Checks --- 
+        if (!opponentPaddle || !ball || !ball.position || !ballVelocity) {
+            console.warn("updateOpponentPaddle called with missing objects");
+            return; // Exit early if critical objects are missing
+        }
+        if (!opponentPaddle.userData || !opponentPaddle.userData.lastPrediction || typeof opponentPaddle.userData.lastPrediction.x === 'undefined' || typeof opponentPaddle.userData.lastPrediction.y === 'undefined') {
+            // Ensure userData and lastPrediction are initialized if somehow missing or incomplete
+            opponentPaddle.userData = {
+                velocityX: 0, velocityY: 0, targetX: 0, targetY: 0,
+                lastPrediction: { x: 0, y: 0 }, predictionConfidence: 0
+            };
+            console.warn("Re-initialized missing or incomplete opponentPaddle.userData");
+        }
+        // --- End Defensive Checks ---
+
         // Store previous position for smoothing
         const prevX = opponentPaddle.position.x;
         const prevY = opponentPaddle.position.y;
@@ -471,7 +500,7 @@ function updateOpponentPaddle() {
                 velocityY: 0,
                 targetX: 0,
                 targetY: 0,
-                lastPrediction: { x: 0, y: 0 },
+                lastPrediction: { x: 0, y: 0 }, // Initialize lastPrediction with x and y
                 predictionConfidence: 0
             };
         }
@@ -810,7 +839,23 @@ function startGame() {
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = aspect;
+
+    // Adjust camera FOV and position for portrait vs landscape
+    const baseFOV = 75;
+    const baseZ = 400;
+
+    if (aspect < 1) { // Portrait or square view
+        // Increase FOV slightly and push camera back to fit width
+        // Increase the multipliers for a more significant adjustment
+        camera.fov = baseFOV * (1 + (1 - aspect) * 0.5); // Increased FOV multiplier from 0.2 to 0.5
+        camera.position.z = baseZ + (baseZ * (1 - aspect) * 0.6); // Increased Z multiplier from 0.3 to 0.6
+    } else { // Landscape view
+        camera.fov = baseFOV;
+        camera.position.z = baseZ;
+    }
+
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
@@ -1190,6 +1235,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update reference to start button
     const startButton = document.getElementById('start-button');
     startButton.addEventListener('click', startGame);
+
+    // Add touchend listener specifically for mobile tap reliability
+    startButton.addEventListener('touchend', function(event) {
+        event.preventDefault(); // Prevent potential double event firing (touch then click)
+        startGame();
+    });
 });
 
 // Function to display encouraging messages in the chat bubble
@@ -1948,6 +1999,31 @@ function hideBackgroundParticles() {
     const container = document.getElementById('background-particles-container');
     if (container) {
         container.style.display = 'none';
+    }
+}
+
+// Handle Mouse Movement
+function onDocumentMouseMove(event) {
+    // Normalize mouse position (-1 to +1 range)
+    mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+// Handle Touch Start
+function onDocumentTouchStart(event) {
+    if (event.touches.length === 1) {
+        event.preventDefault(); // Prevent scrolling/zooming
+        mousePosition.x = (event.touches[0].pageX / window.innerWidth) * 2 - 1;
+        mousePosition.y = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
+    }
+}
+
+// Handle Touch Move
+function onDocumentTouchMove(event) {
+    if (event.touches.length === 1) {
+        event.preventDefault(); // Prevent scrolling/zooming
+        mousePosition.x = (event.touches[0].pageX / window.innerWidth) * 2 - 1;
+        mousePosition.y = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
     }
 }
 

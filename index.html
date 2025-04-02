@@ -173,6 +173,58 @@
             75% { transform: translate(60px, 30px) rotate(270deg); opacity: 0.8; } 
             100% { transform: translate(0, 0) rotate(360deg); opacity: 0.5; } 
         }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 768px) {
+            /* Scale down UI text */
+            h1 {
+                font-size: 48px !important; /* Reduce title size */
+            }
+            #start-screen h1, #game-over-screen h1 {
+                font-size: 36px !important; /* Reduce screen titles */
+            }
+            #start-screen button, #game-over-screen button {
+                font-size: 18px !important;
+                padding: 12px 24px !important;
+            }
+            .score-display {
+                font-size: 20px !important; /* Reduce score size */
+                padding: 8px 15px !important;
+            }
+            .chat-bubble {
+                font-size: 12px !important;
+                padding: 8px 12px !important;
+                min-width: 100px !important;
+                top: -50px !important;
+                left: 30px !important;
+            }
+            .overlay-image {
+                width: 60px !important; /* Reduce Kev image size */
+                height: 60px !important;
+            }
+            .bottom-left-overlay {
+                 bottom: 10px !important; /* Adjust position */
+                 left: 10px !important;
+            }
+        }
+
+        @media (max-height: 600px) {
+             h1 {
+                 font-size: 30px !important; /* Further reduce for short screens */
+             }
+             #start-screen button, #game-over-screen button {
+                 font-size: 16px !important;
+                 padding: 10px 20px !important;
+             }
+             .overlay-image {
+                 width: 50px !important;
+                 height: 50px !important;
+             }
+             .chat-bubble {
+                 font-size: 11px !important;
+                 top: -45px !important;
+             }
+        }
     </style>
 </head>
 <body>
