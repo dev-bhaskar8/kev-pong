@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kevinity Pong</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Additional styles to ensure overlay visibility */
+        .bottom-left-overlay {
+            position: fixed !important; /* Use fixed instead of absolute for better overlay positioning */
+            bottom: 20px !important;
+            left: 20px !important;
+            z-index: 9999 !important; /* Extremely high z-index to guarantee it's on top */
+            pointer-events: auto !important; /* Allow clicks on the overlay */
+            display: none; /* Initially hidden, will be shown during gameplay */
+        }
+        
+        /* Style for the Kev image in the overlay */
+        .overlay-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid #ff6600;
+            box-shadow: 0 0 15px rgba(255, 102, 0, 0.9);
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.7));
+            animation: pulseBorder 2s infinite ease-in-out;
+            transform-origin: center center;
+            cursor: pointer; /* Show pointer cursor on hover */
+        }
+        
+        /* Chat bubble styles */
+        .chat-bubble {
+            position: absolute;
+            top: -60px;
+            left: 40px;
+            background-color: #ff9933;
+            border: 2px solid #ff6600;
+            border-radius: 12px;
+            padding: 10px 15px;
+            min-width: 140px;
+            max-width: 200px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease-out;
+            pointer-events: none;
+            z-index: 10000;
+        }
+        
+        .chat-bubble.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .chat-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 15px;
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: #ff9933 transparent transparent;
+        }
+        
+        .chat-bubble-text {
+            color: #fff;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            margin: 0;
+            text-align: center;
+        }
+        
+        /* Animation for the image border */
+        @keyframes pulseBorder {
+            0% { border-color: #ff6600; box-shadow: 0 0 15px rgba(255, 102, 0, 0.9); transform: scale(1); }
+            50% { border-color: #ffaa33; box-shadow: 0 0 25px rgba(255, 170, 51, 0.9); transform: scale(1.05); }
+            100% { border-color: #ff6600; box-shadow: 0 0 15px rgba(255, 102, 0, 0.9); transform: scale(1); }
+        }
+        
+        /* Shake animation for the image when clicked */
+        @keyframes shake {
+            0% { transform: rotate(0deg) scale(1); border-color: #ff9900; }
+            10% { transform: rotate(-10deg) scale(1.05); border-color: #ffcc00; }
+            20% { transform: rotate(10deg) scale(1.05); border-color: #ffee00; }
+            30% { transform: rotate(-10deg) scale(1.05); border-color: #ffcc00; }
+            40% { transform: rotate(10deg) scale(1.05); border-color: #ffaa00; }
+            50% { transform: rotate(-10deg) scale(1.05); border-color: #ff8800; }
+            60% { transform: rotate(10deg) scale(1.05); border-color: #ff6600; }
+            70% { transform: rotate(-10deg) scale(1.05); border-color: #ff4400; }
+            80% { transform: rotate(10deg) scale(1.05); border-color: #ff6600; }
+            90% { transform: rotate(-5deg) scale(1.02); border-color: #ff8800; }
+            100% { transform: rotate(0deg) scale(1); border-color: #ff6600; }
+        }
+        
+        /* Override original animation with shake animation */
+        .overlay-image.shake {
+            animation: shake 0.6s ease-in-out !important;
+        }
+        
+        /* Ensure the game container is positioned relative for absolute positioning */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Ensure the canvas doesn't cover our overlays */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        /* Make sure score container appears above canvas */
+        .score-container {
+            position: fixed !important;
+            top: 20px !important;
+            left: 0 !important;
+            right: 0 !important;
+            text-align: center !important;
+            z-index: 9999 !important;
+            pointer-events: none !important;
+            display: none !important; /* Hidden by default */
+        }
+        
+        .score-display {
+            display: inline-block !important;
+            background-color: rgba(0, 0, 0, 0.5) !important;
+            padding: 10px 20px !important;
+            border-radius: 10px !important;
+            min-width: 120px !important;
+            box-shadow: 0 0 15px rgba(255, 102, 0, 0.5) !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="score-container">
+            <div class="score-display">
+                <span id="player-score">0</span>
+                <span>:</span>
+                <span id="opponent-score">0</span>
+            </div>
+        </div>
+        <div id="start-screen">
+            <h1>KEVINITY PONG</h1>
+            <button id="start-button">Start Game</button>
+        </div>
+        <div id="game-over-screen" style="display: none;">
+            <h1>Game Over</h1>
+            <div id="game-result"></div>
+            <button id="restart-button">Play Again</button>
+        </div>
+        
+        <!-- Always visible Kev image overlay in bottom left -->
+        <div class="bottom-left-overlay">
+            <img src="image.png" alt="Kev" class="overlay-image">
+            <div class="chat-bubble">
+                <p class="chat-bubble-text">Great shot!</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="main.js"></script>
+</body>
+</html> 
