@@ -146,23 +146,21 @@
         
         /* Style for the background particle container */
         #background-particles-container {
-            position: fixed;
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 0; /* Place it behind the canvas (z-index: 1) but above body */
             overflow: hidden;
             pointer-events: none;
-            display: none; /* Hidden by default, shown during gameplay */
+            z-index: 1001; /* Above start screen background (1000), below content (1002) */
         }
         
         /* Style for individual background particles (copied from start screen) */
         .background-particle {
             position: absolute;
             border-radius: 50%;
-            animation: floatParticleBackground 8s infinite ease-in-out;
-            /* z-index handled by container */
+            animation: floatParticleBackground linear infinite;
         }
         
         /* Background particle animation */
@@ -287,6 +285,34 @@
                  font-size: 11px !important;
                  top: -45px !important;
              }
+        }
+    </style>
+
+    <!-- Add Style for Background Particles -->
+    <style>
+        #background-particles-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 1001; /* Above start screen background (1000), below content (1002) */
+        }
+
+        .background-particle {
+            position: absolute;
+            border-radius: 50%;
+            animation: floatParticleBackground linear infinite;
+        }
+
+        @keyframes floatParticleBackground {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 0.5; } 
+            25% { transform: translate(-30px, 30px) rotate(90deg); opacity: 0.8; } 
+            50% { transform: translate(30px, 60px) rotate(180deg); opacity: 1; } 
+            75% { transform: translate(60px, 30px) rotate(270deg); opacity: 0.8; } 
+            100% { transform: translate(0, 0) rotate(360deg); opacity: 0.5; } 
         }
     </style>
 </head>

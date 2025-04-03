@@ -479,6 +479,17 @@ function createPaddles() {
     
     // For convenience in updating position, store the group as opponentPaddle
     opponentPaddle = opponentPaddleGroup;
+
+    // Initialize opponent paddle user data
+    opponentPaddle.userData = {
+        velocityX: 0,
+        velocityY: 0,
+        targetX: 0,
+        targetY: 0,
+        lastPrediction: { x: 0, y: 0 }, // Initialize here
+        predictionConfidence: 0,
+        isFirstHitAfterServe: false // Initialize here
+    };
 }
 
 function setupMouseControl() {
@@ -516,42 +527,17 @@ function updatePlayerPaddlePosition() {
 function updateOpponentPaddle() {
     try {
         // --- Defensive Checks --- 
-        if (!opponentPaddle || !ball || !ball.position || !ballVelocity) {
-            console.warn("updateOpponentPaddle called with missing objects");
+        if (!opponentPaddle || !ball || !ball.position || !ballVelocity || !opponentPaddle.userData || !opponentPaddle.userData.lastPrediction) {
+            console.error("updateOpponentPaddle called with missing objects or properties!");
+            // Attempt recovery or exit
+            opponentPaddle.position.set(0, 0, -ARENA_LENGTH / 2 + 10); // Reset position
+            // Ensure userData is at least minimally set for future frames
+            if (!opponentPaddle.userData) opponentPaddle.userData = { velocityX: 0, velocityY: 0, targetX: 0, targetY: 0, lastPrediction: {x:0, y:0}, predictionConfidence: 0, isFirstHitAfterServe: false };
+            else if (!opponentPaddle.userData.lastPrediction) opponentPaddle.userData.lastPrediction = {x:0, y:0};
             return; // Exit early if critical objects are missing
         }
 
-        // Ensure userData object exists
-        if (!opponentPaddle.userData) {
-            console.warn("Initializing opponentPaddle.userData");
-            opponentPaddle.userData = {
-                velocityX: 0, velocityY: 0, targetX: 0, targetY: 0,
-                lastPrediction: { x: 0, y: 0 }, predictionConfidence: 0,
-                isFirstHitAfterServe: false // Initialize flag only here
-            };
-        }
-        
-        // Ensure lastPrediction object exists
-        if (!opponentPaddle.userData.lastPrediction) {
-             console.warn("Initializing opponentPaddle.userData.lastPrediction");
-            opponentPaddle.userData.lastPrediction = { x: 0, y: 0 };
-        }
-        // Ensure lastPrediction properties exist
-        if (typeof opponentPaddle.userData.lastPrediction.x === 'undefined') {
-             console.warn("Initializing opponentPaddle.userData.lastPrediction.x");
-            opponentPaddle.userData.lastPrediction.x = 0;
-        }
-        if (typeof opponentPaddle.userData.lastPrediction.y === 'undefined') {
-             console.warn("Initializing opponentPaddle.userData.lastPrediction.y");
-            opponentPaddle.userData.lastPrediction.y = 0;
-        }
-        // Ensure other properties exist (add default if necessary, but preserve isFirstHitAfterServe)
-        if (typeof opponentPaddle.userData.velocityX === 'undefined') opponentPaddle.userData.velocityX = 0;
-        if (typeof opponentPaddle.userData.velocityY === 'undefined') opponentPaddle.userData.velocityY = 0;
-        if (typeof opponentPaddle.userData.targetX === 'undefined') opponentPaddle.userData.targetX = 0;
-        if (typeof opponentPaddle.userData.targetY === 'undefined') opponentPaddle.userData.targetY = 0;
-        if (typeof opponentPaddle.userData.predictionConfidence === 'undefined') opponentPaddle.userData.predictionConfidence = 0;
-        // Intentionally DO NOT reset isFirstHitAfterServe here unless userData itself was missing
+        // --- REMOVED Redundant Initialization Checks --- 
         
         // --- End Defensive Checks ---
 
@@ -1207,20 +1193,32 @@ document.addEventListener('DOMContentLoaded', function() {
     enhancedStartScreen.style.left = '0';
     enhancedStartScreen.style.width = '100%';
     enhancedStartScreen.style.height = '100%';
-    enhancedStartScreen.style.display = 'flex';
     enhancedStartScreen.style.flexDirection = 'column';
     enhancedStartScreen.style.justifyContent = 'center';
     enhancedStartScreen.style.alignItems = 'center';
-    enhancedStartScreen.style.background = 'radial-gradient(circle, #3b0c00 0%, #1a0500 100%)'; // Fully opaque
+    enhancedStartScreen.style.background = 'radial-gradient(circle, #3b0c00 0%, #1a0500 100%)'; // Restore opaque gradient
+    // enhancedStartScreen.style.background = 'transparent'; // REMOVED transparent background
     enhancedStartScreen.style.zIndex = '1000';
     enhancedStartScreen.style.fontFamily = 'Arial, sans-serif';
     enhancedStartScreen.style.color = '#fff';
     enhancedStartScreen.style.textAlign = 'center';
     
-    // Create container for main start screen content
+    // Create a single wrapper for all content to manage z-index layering
+    const contentWrapper = document.createElement('div');
+    contentWrapper.style.position = 'relative'; // Establish stacking context
+    contentWrapper.style.zIndex = '1002';      // Place content above particles (1001)
+    contentWrapper.style.display = 'flex';       // Use flex internally for centering its children
+    contentWrapper.style.flexDirection = 'column';
+    contentWrapper.style.alignItems = 'center';
+    contentWrapper.style.width = '100%';       // Allow flex centering by parent
+    contentWrapper.style.padding = '5vh 0';    // Add some vertical padding if needed
+
+    // Create container for main start screen content (NO position/z-index needed here)
     const mainContentContainer = document.createElement('div');
     mainContentContainer.id = 'start-main-content';
-    mainContentContainer.style.display = 'flex'; // Use flex to maintain centering
+    // mainContentContainer.style.position = 'relative'; // REMOVED
+    // mainContentContainer.style.zIndex = '1002'; // REMOVED
+    mainContentContainer.style.display = 'flex'; 
     mainContentContainer.style.flexDirection = 'column';
     mainContentContainer.style.alignItems = 'center';
     mainContentContainer.style.justifyContent = 'center';
@@ -1238,6 +1236,27 @@ document.addEventListener('DOMContentLoaded', function() {
     kevImage.style.border = '3px solid #ff6600'; // Orange border
     kevImage.style.marginBottom = '20px';
     kevImage.style.boxShadow = '0 0 20px rgba(255, 102, 0, 0.7)'; // Add glow effect
+    // kevImage.style.animation = 'float 2s infinite ease-in-out'; // TEMPORARILY COMMENTED OUT FOR TESTING
+    kevImage.style.cursor = 'pointer'; // Add pointer cursor
+
+    // Add shake animation on click (without chat bubble)
+    kevImage.addEventListener('click', () => {
+        kevImage.classList.remove('shake'); // Ensure animation restarts if clicked quickly
+        void kevImage.offsetWidth; // Force reflow
+        kevImage.classList.add('shake');
+
+        // Remove the class after animation duration (defined in CSS: 0.5s)
+        setTimeout(() => {
+            kevImage.classList.remove('shake');
+        }, 500);
+    });
+
+    // Add touch handler - corrected to trigger the click logic
+    kevImage.addEventListener('touchend', (event) => {
+        event.preventDefault(); // Prevent click after touch
+        kevImage.click(); // Trigger the existing click logic (which adds shake class)
+    });
+
     mainContentContainer.appendChild(kevImage); // Add to main container
     
     // Add title with glow effect
@@ -1303,8 +1322,8 @@ document.addEventListener('DOMContentLoaded', function() {
     buttonElement.style.transition = 'all 0.2s ease-in-out';
     buttonElement.style.letterSpacing = '1px';
     
-    // Floating animation for the button
-    buttonElement.style.animation = 'float 2s infinite ease-in-out';
+    // Floating animation for the button - REMOVED
+    // buttonElement.style.animation = 'float 2s infinite ease-in-out';
     
     // Hover and active states
     buttonElement.onmouseover = function() {
@@ -1369,17 +1388,17 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     mainContentContainer.appendChild(kevinityLink); // Add to main container
     
-    // Append the main content container to the enhanced start screen
-    enhancedStartScreen.appendChild(mainContentContainer);
+    // Append the main content container to the content WRAPPER
+    contentWrapper.appendChild(mainContentContainer);
     
     // --- End moving elements --- 
     
     // Add Leaderboard section directly to Start Screen (initially hidden)
     const startLeaderboardContainer = document.createElement('div');
     startLeaderboardContainer.className = 'leaderboard-container';
-    startLeaderboardContainer.style.marginTop = '5vh'; // Give some space from top
-    // startLeaderboardContainer.style.maxHeight = '200px'; // REMOVED fixed height
-    // startLeaderboardContainer.style.overflowY = 'auto';  // REMOVED overflow
+    // startLeaderboardContainer.style.position = 'relative'; // REMOVED
+    // startLeaderboardContainer.style.zIndex = '1002'; // REMOVED
+    startLeaderboardContainer.style.marginTop = '5vh'; 
     startLeaderboardContainer.style.display = 'none'; // Start hidden
     startLeaderboardContainer.style.width = '90%'; // Relative width
     startLeaderboardContainer.style.maxWidth = '450px'; // Max width
@@ -1406,8 +1425,12 @@ document.addEventListener('DOMContentLoaded', function() {
     startLeaderboardLoading.classList.add('loader'); // Add class for styling
     startLeaderboardContainer.appendChild(startLeaderboardLoading);
     
-    enhancedStartScreen.appendChild(startLeaderboardContainer); // Add leaderboard container
+    // Append leaderboard container to the content WRAPPER
+    contentWrapper.appendChild(startLeaderboardContainer); 
     
+    // Add the single content WRAPPER to the enhanced start screen
+    enhancedStartScreen.appendChild(contentWrapper);
+
     // Add to game container
     gameContainer.appendChild(enhancedStartScreen);
     
@@ -1552,6 +1575,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     `;
     document.head.appendChild(styleElement);
+
+    // --- Define All Animations Here --- 
+    const animationStyleSheet = document.createElement('style');
+    animationStyleSheet.textContent = `
+        /* Floating animation */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Shake animation */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* Apply the shake animation */
+        .shake {
+            animation: shake 0.5s ease-in-out; 
+        }
+
+        /* Pulsing glow animation */
+        @keyframes pulse {
+            0% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1.0; transform: scale(1.05); }
+            100% { opacity: 0.7; transform: scale(1); }
+        }
+
+        /* Background particle animation */
+        @keyframes floatParticleBackground {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 0.5; } 
+            25% { transform: translate(-30px, 30px) rotate(90deg); opacity: 0.8; } 
+            50% { transform: translate(30px, 60px) rotate(180deg); opacity: 1; } 
+            75% { transform: translate(60px, 30px) rotate(270deg); opacity: 0.8; } 
+            100% { transform: translate(0, 0) rotate(360deg); opacity: 0.5; } 
+        }
+
+        /* Spinner animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(animationStyleSheet);
+
+    // Create background particles for the start screen immediately
+    createBackgroundParticles();
 });
 
 // Function to display encouraging messages in the chat bubble
@@ -1758,6 +1830,12 @@ function setupKevImageInteraction() {
         
         // Add click handler
         kevImage.addEventListener('click', handleKevClick);
+        
+        // Add touch handler
+        kevImage.addEventListener('touchend', (event) => {
+            event.preventDefault(); // Prevent click after touch
+            handleKevClick(); // Trigger same logic as click
+        });
         
         function handleKevClick() {
             try {
@@ -2348,6 +2426,9 @@ function restartGame() {
     }
     hideBackgroundParticles();
 
+    // Recreate background particles for the start screen
+    createBackgroundParticles();
+
     // No longer reset ball or hide cursor here
     // // Hide cursor again for the new game
     // document.body.classList.add('game-active');
@@ -2583,6 +2664,11 @@ styleSheet.textContent = `
         0%, 100% { transform: translateX(0); }
         25% { transform: translateX(-10px); }
         75% { transform: translateX(10px); }
+    }
+
+    /* Apply the shake animation */
+    .shake {
+        animation: shake 0.5s ease-in-out; 
     }
 `;
 document.head.appendChild(styleSheet);
