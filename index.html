@@ -137,11 +137,14 @@
         
         .score-display {
             display: inline-block !important;
-            background-color: rgba(0, 0, 0, 0.5) !important;
+            background-color: transparent !important; /* Transparent background */
             padding: 10px 20px !important;
             border-radius: 10px !important;
             min-width: 120px !important;
-            box-shadow: 0 0 15px rgba(255, 102, 0, 0.5) !important;
+            box-shadow: none !important; /* No shadow */
+            font-size: 28px !important; /* Explicit font size */
+            color: #ff6600 !important; /* Orange text */
+            text-shadow: 0 0 10px rgba(255, 102, 0, 0.5) !important; /* Text glow */
         }
         
         /* Style for the background particle container */
@@ -183,14 +186,14 @@
             top: 20px !important;
             right: 30px !important;
             font-family: Arial, sans-serif;
-            font-size: 28px;
+            font-size: 28px !important; /* Same as score-display */
             font-weight: bold;
             color: #ff6600;
             text-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: transparent; /* Transparent background */
             padding: 10px 20px;
             border-radius: 10px;
-            box-shadow: 0 0 15px rgba(255, 102, 0, 0.5);
+            box-shadow: none; /* No shadow */
             z-index: 9999 !important;
             pointer-events: none !important;
             display: none !important;
@@ -251,6 +254,15 @@
             .score-display {
                 font-size: 20px !important; /* Reduce score size */
                 padding: 8px 15px !important;
+                background-color: transparent !important; /* Remove background */
+                box-shadow: none !important; /* Remove shadow */
+            }
+            #timer-display {
+                font-size: 20px !important; /* Match score font size */
+                padding: 8px 15px !important;
+                background-color: transparent !important; /* Remove background */
+                box-shadow: none !important; /* Remove shadow */
+                right: 15px !important; /* Position closer to edge */
             }
             .chat-bubble {
                 font-size: 12px !important;

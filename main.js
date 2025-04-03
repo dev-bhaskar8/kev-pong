@@ -896,19 +896,19 @@ function startGame() {
     playerScoreElement.textContent = gameState.scores.player;
     opponentScoreElement.textContent = gameState.scores.opponent;
     
-    // Show the score container - override !important CSS rule
+    // Show score container
     const scoreContainer = document.querySelector('.score-container');
     if (scoreContainer) {
-        // Using setAttribute to override !important CSS while preserving other styles
+        // Using a smaller set of styles and letting CSS media queries handle responsiveness
         scoreContainer.setAttribute('style', 
-            'display: block !important; ' +
             'position: fixed !important; ' +
             'top: 20px !important; ' +
             'left: 0 !important; ' +
             'right: 0 !important; ' +
             'text-align: center !important; ' +
             'z-index: 9999 !important; ' +
-            'pointer-events: none !important;'
+            'pointer-events: none !important; ' +
+            'display: block !important;'
         );
     }
     
@@ -941,21 +941,12 @@ function startGame() {
     // Show Timer Display
     const timerElement = document.getElementById('timer-display');
     if (timerElement) {
-        // timerElement.style.display = 'block'; // Can't override !important
+        // Using a smaller set of styles and letting CSS media queries handle responsiveness
         timerElement.setAttribute('style', 
             'display: block !important; ' +
             'position: fixed !important; ' +
             'top: 20px !important; ' +
             'right: 30px !important; ' +
-            'font-family: Arial, sans-serif !important; ' +
-            'font-size: 28px !important; ' + 
-            'font-weight: bold !important; ' +
-            'color: #ff6600 !important; ' + /* Changed back to score color */
-            'text-shadow: 0 0 10px rgba(255, 102, 0, 0.5) !important; ' + /* Added score text shadow */
-            'background-color: rgba(0, 0, 0, 0.5) !important; ' + 
-            'padding: 10px 20px !important; ' + 
-            'border-radius: 10px !important; ' + 
-            'box-shadow: 0 0 15px rgba(255, 102, 0, 0.5) !important; ' + 
             'z-index: 9999 !important; ' + 
             'pointer-events: none !important; '
         );
