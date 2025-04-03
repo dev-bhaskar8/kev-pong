@@ -179,6 +179,64 @@
             cursor: none;
         }
 
+        /* Timer Display Styles */
+        #timer-display {
+            position: fixed !important;
+            top: 20px !important;
+            right: 30px !important;
+            font-family: Arial, sans-serif;
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff6600;
+            text-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(255, 102, 0, 0.5);
+            z-index: 9999 !important;
+            pointer-events: none !important;
+            display: none !important;
+        }
+
+        /* Add spacing for the timer's colon */
+        #timer-display span.colon {
+            margin: 0 10px;
+            display: inline-block;
+        }
+
+        /* Leaderboard Styles */
+        .leaderboard-container {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            max-width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .leaderboard-container h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #ff6600;
+            font-size: 24px;
+            text-shadow: 0 0 5px rgba(255, 102, 0, 0.5);
+        }
+        #leaderboard-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            color: #f0f0f0;
+            font-size: 16px;
+            text-align: left;
+        }
+        #leaderboard-list li {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 170, 51, 0.2);
+        }
+        #leaderboard-list li:last-child {
+            border-bottom: none;
+        }
+
         /* --- Mobile Responsiveness --- */
         @media (max-width: 768px) {
             /* Scale down UI text */
@@ -249,7 +307,19 @@
             <h1>Game Over</h1>
             <div id="game-result"></div>
             <button id="restart-button">Play Again</button>
+
+            <div class="leaderboard-container">
+                <h2>Top Scores</h2>
+                <ul id="leaderboard-list">
+                    <!-- Scores will be loaded here -->
+                </ul>
+                <div id="leaderboard-loading" style="display: none; color: #ffaa33;">Loading...</div>
+            </div>
+
         </div>
+        
+        <!-- Timer Display -->
+        <div id="timer-display">00:00</div>
         
         <!-- Add a container for the 2D background particles -->
         <div id="background-particles-container"></div>
@@ -264,6 +334,12 @@
     </div>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Firebase App (Core) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <!-- Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
     <script src="main.js"></script>
 </body>
 </html> 

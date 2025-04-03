@@ -1,3 +1,108 @@
+// --- Firebase Setup & Leaderboard Functions --- 
+
+// Your web app's Firebase configuration (Using provided config)
+const firebaseConfig = {
+  apiKey: "AIzaSyCLaPyzBSFwceNC3ncbuvB31P1Z4h1zmTw",
+  authDomain: "kev-pong.firebaseapp.com",
+  projectId: "kev-pong",
+  storageBucket: "kev-pong.firebasestorage.app",
+  messagingSenderId: "818433206211",
+  appId: "1:818433206211:web:79561a2eeac0a424823f76",
+  measurementId: "G-P4FN7PGX2T"
+};
+
+// Initialize Firebase
+let app;
+let db;
+try {
+    app = firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore(); // Use compat syntax
+} catch (error) {
+    console.error("Firebase initialization failed:", error);
+    // Handle initialization error (e.g., disable leaderboard features)
+}
+
+// Function to save score to Firestore
+async function saveScoreToLeaderboard(playerName, score) {
+    if (!db) {
+        console.error("Firestore not initialized, cannot save score.");
+        return;
+    }
+    try {
+        // Use v8/compat syntax: db.collection(...).add(...)
+        await db.collection("scores").add({
+            name: playerName,
+            score: score,
+            timeSeconds: Math.floor(gameState.elapsedTimeSeconds), // ADDED: Save elapsed time
+            timestamp: firebase.firestore.FieldValue.serverTimestamp() // This compat syntax is correct
+        });
+    } catch (error) {
+        console.error("Error saving score: ", error);
+    }
+}
+
+// Function to fetch and display leaderboard
+async function displayLeaderboard(listElementId, loadingElementId) { // Accept IDs as arguments
+    if (!db) {
+        console.error("Firestore not initialized, cannot display leaderboard.");
+        return; // Or display a message indicating leaderboard is unavailable
+    }
+
+    const leaderboardElement = document.getElementById(listElementId); // Use argument ID
+    const loadingElement = document.getElementById(loadingElementId); // Use argument ID
+    if (!leaderboardElement || !loadingElement) {
+        console.error(`Leaderboard elements not found: ${listElementId}, ${loadingElementId}`);
+        return;
+    }
+
+    leaderboardElement.innerHTML = ''; // Clear previous entries
+    loadingElement.style.display = 'block'; // Show loading indicator
+
+    try {
+        // Use v8/compat syntax: db.collection(...).orderBy(...).limit(...).get()
+        const scoresCollection = db.collection("scores");
+        const q = scoresCollection
+                      .orderBy("timeSeconds", "asc") // Order by timeSeconds ascending (lower is better)
+                      .limit(10); // Limit to top 10
+
+        const querySnapshot = await q.get(); // Use .get() on the query
+        
+        if (querySnapshot.empty) {
+            leaderboardElement.innerHTML = '<li class="no-info">No info yet!</li>'; // Add class
+        } else {
+            let rank = 0; // Initialize rank counter
+            querySnapshot.forEach((doc) => { // The callback only receives 'doc' reliably
+                const data = doc.data();
+                
+                // Format timeSeconds into MM:SS
+                const totalSeconds = data.timeSeconds || 0;
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                const formattedTime = 
+                    String(minutes).padStart(2, '0') + ':' + 
+                    String(seconds).padStart(2, '0');
+                
+                const listItem = document.createElement('li');
+                rank++; // Increment rank for the current item (starts at 1)
+                if (rank === 1) {
+                    listItem.classList.add('top-score'); // Add class for #1
+                }
+                // Display Name and Formatted Time
+                listItem.textContent = `#${rank}: ${data.name || 'Anon'} - ${formattedTime}`;
+                leaderboardElement.appendChild(listItem);
+            });
+        }
+    } catch (error) {
+        console.error("Error fetching leaderboard: ", error);
+        leaderboardElement.innerHTML = '<li class="no-info">Error loading times.</li>'; // Add class
+    } finally {
+        loadingElement.style.display = 'none'; // Hide loading indicator
+    }
+}
+
+// --- End Firebase Setup & Leaderboard Functions ---
+
+
 // Game state
 const gameState = {
     started: false,
@@ -6,7 +111,8 @@ const gameState = {
         player: 0,
         opponent: 0
     },
-    winningScore: 11,
+    winningScore: 3,    // Changed back from 1 - First to score 3 wins
+    elapsedTimeSeconds: 0, // ADDED - Game timer
     currentBallSpeed: 0, // Added to track dynamic speed
     countdown: {
         active: false,
@@ -577,7 +683,6 @@ function updateOpponentPaddle() {
         
         // --- Instant Move for First Hit --- 
         if (opponentPaddle.userData.isFirstHitAfterServe) { // Directly use the flag here
-            console.log("DIAG: Teleporting opponent for first hit! Target:", targetX, targetY); // DIAGNOSTIC
             opponentPaddle.position.x = targetX;
             opponentPaddle.position.y = targetY;
             // Ensure velocity is reset after teleport to avoid overshoot on next frame
@@ -799,6 +904,7 @@ function startGame() {
     gameState.scores.player = 0;
     gameState.scores.opponent = 0;
     gameState.currentBallSpeed = BALL_SPEED; // Initialize ball speed
+    gameState.elapsedTimeSeconds = 0; // Reset timer
     
     // Update score display
     playerScoreElement.textContent = gameState.scores.player;
@@ -844,7 +950,30 @@ function startGame() {
     // Set flag for AI's first hit on initial serve
     if (opponentPaddle.userData) {
         opponentPaddle.userData.isFirstHitAfterServe = true;
-        console.log("INFO (startGame): Setting isFirstHitAfterServe = true"); // DIAGNOSTIC
+    }
+
+    // Show Timer Display
+    const timerElement = document.getElementById('timer-display');
+    if (timerElement) {
+        // timerElement.style.display = 'block'; // Can't override !important
+        timerElement.setAttribute('style', 
+            'display: block !important; ' +
+            'position: fixed !important; ' +
+            'top: 20px !important; ' +
+            'right: 30px !important; ' +
+            'font-family: Arial, sans-serif !important; ' +
+            'font-size: 28px !important; ' + 
+            'font-weight: bold !important; ' +
+            'color: #ff6600 !important; ' + /* Changed back to score color */
+            'text-shadow: 0 0 10px rgba(255, 102, 0, 0.5) !important; ' + /* Added score text shadow */
+            'background-color: rgba(0, 0, 0, 0.5) !important; ' + 
+            'padding: 10px 20px !important; ' + 
+            'border-radius: 10px !important; ' + 
+            'box-shadow: 0 0 15px rgba(255, 102, 0, 0.5) !important; ' + 
+            'z-index: 9999 !important; ' + 
+            'pointer-events: none !important; '
+        );
+        updateTimerDisplay(); // Show initial 00:00
     }
 }
 
@@ -906,12 +1035,17 @@ function animate(timestamp) {
                     // If serving to opponent, set flag for first hit accuracy
                     if (!gameState.countdown.serveToPlayer && opponentPaddle.userData) {
                         opponentPaddle.userData.isFirstHitAfterServe = true;
-                        console.log("INFO: Setting isFirstHitAfterServe = true"); // DIAGNOSTIC
                     }
                 }
             }
         }
         
+        // Update game timer if game is active and not in countdown
+        if (gameState.started && !gameState.over && !gameState.countdown.active) {
+            gameState.elapsedTimeSeconds += cappedDeltaTime;
+            updateTimerDisplay(); // Update display every frame
+        }
+
         // Update player paddle based on mouse position
         updatePlayerPaddlePosition();
         
@@ -1083,6 +1217,17 @@ document.addEventListener('DOMContentLoaded', function() {
     enhancedStartScreen.style.color = '#fff';
     enhancedStartScreen.style.textAlign = 'center';
     
+    // Create container for main start screen content
+    const mainContentContainer = document.createElement('div');
+    mainContentContainer.id = 'start-main-content';
+    mainContentContainer.style.display = 'flex'; // Use flex to maintain centering
+    mainContentContainer.style.flexDirection = 'column';
+    mainContentContainer.style.alignItems = 'center';
+    mainContentContainer.style.justifyContent = 'center';
+    mainContentContainer.style.width = '100%'; // Take full width for centering
+    
+    // --- Move existing elements into mainContentContainer ---
+    
     // Add Kev's image above the title
     const kevImage = document.createElement('img');
     kevImage.src = 'image.png';
@@ -1093,7 +1238,7 @@ document.addEventListener('DOMContentLoaded', function() {
     kevImage.style.border = '3px solid #ff6600'; // Orange border
     kevImage.style.marginBottom = '20px';
     kevImage.style.boxShadow = '0 0 20px rgba(255, 102, 0, 0.7)'; // Add glow effect
-    enhancedStartScreen.appendChild(kevImage);
+    mainContentContainer.appendChild(kevImage); // Add to main container
     
     // Add title with glow effect
     const titleElement = document.createElement('h1');
@@ -1105,7 +1250,7 @@ document.addEventListener('DOMContentLoaded', function() {
     titleElement.style.textShadow = '0 0 20px rgba(255, 102, 0, 0.7)';
     titleElement.style.letterSpacing = '4px';
     titleElement.style.animation = 'pulse 1.5s infinite alternate';
-    enhancedStartScreen.appendChild(titleElement);
+    mainContentContainer.appendChild(titleElement); // Add to main container
     
     // Add subtitle
     const subtitleElement = document.createElement('h2');
@@ -1114,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', function() {
     subtitleElement.style.marginBottom = '40px';
     subtitleElement.style.color = '#ff9933';
     subtitleElement.style.fontWeight = 'normal';
-    enhancedStartScreen.appendChild(subtitleElement);
+    mainContentContainer.appendChild(subtitleElement); // Add to main container
     
     // Add instructions box
     const instructionsContainer = document.createElement('div');
@@ -1134,15 +1279,13 @@ document.addEventListener('DOMContentLoaded', function() {
     instructionsContainer.appendChild(instructionsTitle);
     
     const instructions = document.createElement('p');
-    instructions.innerHTML = '• Move your mouse to control the paddle<br>' +
+    instructions.innerHTML = '• Move your mouse/finger to control the paddle<br>' +
                            '• Deflect the ball to score points<br>' +
-                           '• First to 11 points wins<br>' +
-                           '• Experience Kevinity-powered gaming!';
+                           '• First to 3 points wins'; // Updated win condition
     instructions.style.textAlign = 'left';
     instructions.style.lineHeight = '1.6';
     instructionsContainer.appendChild(instructions);
-    
-    enhancedStartScreen.appendChild(instructionsContainer);
+    mainContentContainer.appendChild(instructionsContainer); // Add to main container
     
     // Create animated start button
     const buttonElement = document.createElement('button');
@@ -1179,8 +1322,35 @@ document.addEventListener('DOMContentLoaded', function() {
         this.style.transform = 'scale(1.05)';
     };
     
-    enhancedStartScreen.appendChild(buttonElement);
+    mainContentContainer.appendChild(buttonElement); // Add to main container
     
+    // Add "View Scores" button below Start Game
+    const viewScoresButton = document.createElement('button');
+    viewScoresButton.id = 'view-scores-button';
+    viewScoresButton.innerText = 'VIEW LEADERBOARD'; // Changed text
+    // Style similar to start button but maybe smaller/secondary
+    viewScoresButton.style.fontSize = '18px';
+    viewScoresButton.style.padding = '10px 25px';
+    viewScoresButton.style.background = 'transparent';
+    viewScoresButton.style.border = '2px solid #ff6600'; // Outline style
+    viewScoresButton.style.borderRadius = '25px';
+    viewScoresButton.style.color = '#ff6600'; // Orange text
+    viewScoresButton.style.fontWeight = 'bold';
+    viewScoresButton.style.cursor = 'pointer';
+    viewScoresButton.style.marginTop = '20px'; // Space below start button
+    viewScoresButton.style.transition = 'all 0.2s ease-in-out';
+    viewScoresButton.style.letterSpacing = '1px';
+
+    viewScoresButton.onmouseover = function() {
+        this.style.backgroundColor = 'rgba(255, 102, 0, 0.2)'; // Slight orange background on hover
+        this.style.color = '#ffffff'; // White text on hover
+    };
+    viewScoresButton.onmouseout = function() {
+        this.style.backgroundColor = 'transparent';
+        this.style.color = '#ff6600';
+    };
+    mainContentContainer.appendChild(viewScoresButton); // Add to main container
+
     // Add link to Kevinity.ai
     const kevinityLink = document.createElement('a');
     kevinityLink.href = 'https://kevinity.ai';
@@ -1197,56 +1367,46 @@ document.addEventListener('DOMContentLoaded', function() {
     kevinityLink.onmouseout = function() {
         this.style.textDecoration = 'none';
     };
-    enhancedStartScreen.appendChild(kevinityLink);
+    mainContentContainer.appendChild(kevinityLink); // Add to main container
     
-    // Add copyright text
-    const copyrightText = document.createElement('div');
-    copyrightText.innerHTML = '© ' + new Date().getFullYear() + ' Kevinity.ai - All Rights Reserved';
-    copyrightText.style.position = 'absolute';
-    copyrightText.style.bottom = '20px';
-    copyrightText.style.fontSize = '12px';
-    copyrightText.style.color = 'rgba(255,255,255,0.7)';
-    enhancedStartScreen.appendChild(copyrightText);
+    // Append the main content container to the enhanced start screen
+    enhancedStartScreen.appendChild(mainContentContainer);
     
-    // Add decorative particles to the background
-    for (let i = 0; i < 20; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'start-screen-particle';
-        particle.style.position = 'absolute';
-        particle.style.width = (3 + Math.random() * 6) + 'px';
-        particle.style.height = particle.style.width;
-        particle.style.borderRadius = '50%';
-        particle.style.backgroundColor = `rgba(255, ${100 + Math.floor(Math.random() * 155)}, 0, ${0.3 + Math.random() * 0.7})`;
-        particle.style.top = Math.random() * 100 + '%';
-        particle.style.left = Math.random() * 100 + '%';
-        particle.style.animation = `floatParticle ${3 + Math.random() * 8}s infinite ease-in-out ${Math.random() * 5}s`;
-        particle.style.zIndex = '-1';
-        enhancedStartScreen.appendChild(particle);
-    }
+    // --- End moving elements --- 
     
-    // Add CSS animations
-    const styleElement = document.createElement('style');
-    styleElement.textContent = `
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.05); opacity: 0.9; }
-        }
-        
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
-        
-        @keyframes floatParticle {
-            0% { transform: translate(0, 0) rotate(0deg); }
-            25% { transform: translate(-20px, 20px) rotate(90deg); }
-            50% { transform: translate(20px, 40px) rotate(180deg); }
-            75% { transform: translate(40px, 20px) rotate(270deg); }
-            100% { transform: translate(0, 0) rotate(360deg); }
-        }
-    `;
-    document.head.appendChild(styleElement);
+    // Add Leaderboard section directly to Start Screen (initially hidden)
+    const startLeaderboardContainer = document.createElement('div');
+    startLeaderboardContainer.className = 'leaderboard-container';
+    startLeaderboardContainer.style.marginTop = '5vh'; // Give some space from top
+    // startLeaderboardContainer.style.maxHeight = '200px'; // REMOVED fixed height
+    // startLeaderboardContainer.style.overflowY = 'auto';  // REMOVED overflow
+    startLeaderboardContainer.style.display = 'none'; // Start hidden
+    startLeaderboardContainer.style.width = '90%'; // Relative width
+    startLeaderboardContainer.style.maxWidth = '450px'; // Max width
+    startLeaderboardContainer.style.margin = '5vh auto 0 auto'; // Center horizontally
+    startLeaderboardContainer.style.padding = '25px'; // Internal padding
+    startLeaderboardContainer.style.background = 'rgba(0, 0, 0, 0.4)'; // Slightly darker background
+    startLeaderboardContainer.style.border = '1px solid #ff6600'; // Theme border
+    startLeaderboardContainer.style.borderRadius = '15px'; // Rounded corners
+    startLeaderboardContainer.style.boxShadow = '0 0 15px rgba(255, 102, 0, 0.3)'; // Subtle glow
+
+    const startLeaderboardTitle = document.createElement('h2');
+    startLeaderboardTitle.innerText = 'Leaderboard'; // Changed from Top Scores
+    startLeaderboardContainer.appendChild(startLeaderboardTitle);
+
+    const startLeaderboardList = document.createElement('ul');
+    startLeaderboardList.id = 'start-leaderboard-list'; // Unique ID
+    startLeaderboardContainer.appendChild(startLeaderboardList);
+
+    const startLeaderboardLoading = document.createElement('div');
+    startLeaderboardLoading.id = 'start-leaderboard-loading'; // Unique ID
+    startLeaderboardLoading.style.display = 'none';
+    startLeaderboardLoading.style.color = '#ffaa33';
+    // startLeaderboardLoading.innerText = 'Loading...'; // Replace text with spinner
+    startLeaderboardLoading.classList.add('loader'); // Add class for styling
+    startLeaderboardContainer.appendChild(startLeaderboardLoading);
+    
+    enhancedStartScreen.appendChild(startLeaderboardContainer); // Add leaderboard container
     
     // Add to game container
     gameContainer.appendChild(enhancedStartScreen);
@@ -1260,6 +1420,138 @@ document.addEventListener('DOMContentLoaded', function() {
         event.preventDefault(); // Prevent potential double event firing (touch then click)
         startGame();
     });
+
+    // Add click listener for the VIEW SCORES button
+    viewScoresButton.addEventListener('click', () => {
+        const startLeaderboardContainer = document.getElementById('start-screen').querySelector('.leaderboard-container');
+        const mainContentContainer = document.getElementById('start-main-content');
+        
+        if (!startLeaderboardContainer || !mainContentContainer) return; // Safety check
+
+        mainContentContainer.style.display = 'none'; // Hide main content
+        startLeaderboardContainer.style.display = 'block'; // Show leaderboard
+
+        // Create and add Back button if it doesn't exist
+        if (!document.getElementById('back-to-start-button')) {
+            const backButton = document.createElement('button');
+            backButton.id = 'back-to-start-button';
+            backButton.innerText = 'BACK';
+            // Style similarly to View Scores button
+            backButton.style.fontSize = '18px';
+            backButton.style.padding = '10px 25px';
+            backButton.style.background = 'transparent';
+            backButton.style.border = '2px solid #ff6600';
+            backButton.style.borderRadius = '25px';
+            backButton.style.color = '#ff6600';
+            backButton.style.fontWeight = 'bold';
+            backButton.style.cursor = 'pointer';
+            backButton.style.marginTop = '30px'; // Space above button
+            backButton.style.transition = 'all 0.2s ease-in-out';
+            backButton.style.letterSpacing = '1px';
+            backButton.onmouseover = function() { this.style.backgroundColor = 'rgba(255, 102, 0, 0.2)'; this.style.color = '#ffffff'; };
+            backButton.onmouseout = function() { this.style.backgroundColor = 'transparent'; this.style.color = '#ff6600'; };
+            
+            // Add event listener for Back button
+            backButton.addEventListener('click', () => {
+                startLeaderboardContainer.style.display = 'none'; // Hide leaderboard
+                mainContentContainer.style.display = 'flex'; // Show main content (use flex)
+                backButton.remove(); // Remove the back button itself
+                 // Reset the main button text when going back
+                // viewScoresButton.innerText = 'VIEW LEADERBOARD'; // This should be handled by restartGame
+            });
+             // Add touchend listener for Back button (mobile reliability)
+            backButton.addEventListener('touchend', function(event) {
+                event.preventDefault(); 
+                backButton.click(); // Trigger the click event programmatically
+            });
+            
+            // Insert Back button after the leaderboard content
+            startLeaderboardContainer.appendChild(backButton);
+        }
+
+        // Fetch leaderboard data ONLY when showing it the first time or if needed
+        const startLeaderboardList = document.getElementById('start-leaderboard-list');
+        if (!startLeaderboardList || !startLeaderboardList.hasChildNodes() || startLeaderboardList.innerHTML.includes('Error') || startLeaderboardList.innerHTML.includes('No info')) {
+             displayLeaderboard('start-leaderboard-list', 'start-leaderboard-loading');
+        }
+    });
+
+    // Add touchend listener for viewScoresButton (mobile reliability)
+    viewScoresButton.addEventListener('touchend', function(event) {
+        event.preventDefault(); 
+        viewScoresButton.click(); // Trigger the click event programmatically
+    });
+
+    // Add CSS animations and leaderboard styles
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        /* ... (existing @keyframes pulse, float, floatParticle) ... */
+        
+        .leaderboard-container ul {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0 0 0; /* Space below title */
+        }
+        .leaderboard-container li {
+            padding: 12px 8px; /* More padding */
+            border-bottom: 1px solid rgba(255, 102, 0, 0.2);
+            color: #eee;
+            font-size: 17px; /* Slightly larger */
+            transition: background-color 0.2s ease;
+        }
+        .leaderboard-container li:last-child {
+            border-bottom: none;
+        }
+        .leaderboard-container li:hover {
+            background-color: rgba(255, 102, 0, 0.1);
+        }
+        .leaderboard-container li.top-score {
+            color: #ffcc66; /* Gold color for #1 */
+            font-weight: bold;
+        }
+        .leaderboard-container li.no-info {
+            color: #aaa;
+            font-style: italic;
+            text-align: center;
+            border-bottom: none;
+        }
+        
+        .loader {
+            border: 4px solid rgba(255, 170, 51, 0.3); /* Light orange border */
+            border-radius: 50%;
+            border-top: 4px solid #ffaa33; /* Darker orange top border */
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto; /* Center spinner */
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Ensure Back button has enough space */
+        #back-to-start-button {
+             margin-top: 40px !important; /* Increase top margin */
+        }
+
+        /* Potentially style scrollbar if it appears */
+        .leaderboard-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .leaderboard-container::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        .leaderboard-container::-webkit-scrollbar-thumb {
+            background-color: #ff6600;
+            border-radius: 4px;
+            border: 2px solid transparent; /* Creates padding around thumb */
+            background-clip: content-box;
+        }
+    `;
+    document.head.appendChild(styleElement);
 });
 
 // Function to display encouraging messages in the chat bubble
@@ -1672,7 +1964,6 @@ function checkPaddleCollisions() {
         // Reset the first hit flag after the guaranteed hit
         if (opponentPaddle.userData && opponentPaddle.userData.isFirstHitAfterServe) {
             opponentPaddle.userData.isFirstHitAfterServe = false;
-            console.log("INFO: Resetting isFirstHitAfterServe to false after hit"); // DIAGNOSTIC
         }
 
         // Increase ball speed slightly after hit
@@ -1805,13 +2096,23 @@ function checkScoring() {
 }
 
 function checkGameOver() {
+    // Check if either player has reached the winning score
     if (gameState.scores.player >= gameState.winningScore || 
         gameState.scores.opponent >= gameState.winningScore) {
-        
         gameState.over = true;
         
         // Create and display enhanced game over screen
         createKevinityGameOverScreen();
+        
+        // Save score and display leaderboard
+        if (gameState.scores.player > gameState.scores.opponent) {
+            // Show custom name input modal and save score
+            showNameInputModal().then(playerName => {
+                if (playerName) {
+                    saveScoreToLeaderboard(playerName, gameState.scores.player);
+                }
+            });
+        }
         
         return true;
     }
@@ -1924,7 +2225,6 @@ function createKevinityGameOverScreen() {
     scoreDisplay.innerHTML = `${gameState.scores.player} : ${gameState.scores.opponent}`;
     kevinityGameOverScreen.appendChild(scoreDisplay);
     
-    
     // Create restart button
     const restartButtonElement = document.createElement('button');
     restartButtonElement.id = 'restart-button';
@@ -1983,6 +2283,13 @@ function createKevinityGameOverScreen() {
     
     // Update event listener
     document.getElementById('restart-button').addEventListener('click', restartGame);
+
+    // Hide Timer Display
+    const timerElement = document.getElementById('timer-display');
+    if (timerElement) {
+        // timerElement.style.display = 'none'; // Can't override !important
+        timerElement.setAttribute('style', 'display: none !important');
+    }
 }
 
 function restartGame() {
@@ -2006,6 +2313,29 @@ function restartGame() {
     const currentStartScreen = document.getElementById('start-screen');
     if (currentStartScreen) {
         currentStartScreen.style.display = 'flex'; // Use flex to match its original style
+    }
+    
+    // Clear the start screen leaderboard content to force refresh
+    const startLeaderboardList = document.getElementById('start-leaderboard-list');
+    if (startLeaderboardList) {
+        startLeaderboardList.innerHTML = ''; // Clear existing entries
+    }
+    // Also ensure the container is hidden and back button removed if visible
+    const startLeaderboardContainer = document.querySelector('.leaderboard-container'); // Assuming only one on start screen
+    const backButton = document.getElementById('back-to-start-button');
+    const viewScoresButton = document.getElementById('view-scores-button');
+    if (startLeaderboardContainer) {
+        startLeaderboardContainer.style.display = 'none';
+    }
+    if (backButton) {
+        backButton.remove();
+    }
+    if (viewScoresButton) {
+        viewScoresButton.innerText = 'VIEW LEADERBOARD'; // Reset button text - Changed text
+    }
+    const mainContentContainer = document.getElementById('start-main-content');
+    if(mainContentContainer) {
+        mainContentContainer.style.display = 'flex'; // Ensure main content is visible
     }
     
     // Ensure cursor is visible (should already be handled by game over screen)
@@ -2094,6 +2424,168 @@ function onDocumentTouchMove(event) {
         mousePosition.y = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
     }
 }
+
+// Function to update the timer display
+function updateTimerDisplay() {
+    const timerElement = document.getElementById('timer-display');
+    if (!timerElement) return;
+
+    const totalSeconds = Math.floor(gameState.elapsedTimeSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    // Format MM:SS using spans
+    const formattedMinutes = String(minutes).padStart(2, '0');
+    const formattedSeconds = String(seconds).padStart(2, '0');
+
+    // Update innerHTML with spans for styling
+    timerElement.innerHTML = 
+        `<span>${formattedMinutes}</span>` +
+        `<span class="colon">:</span>` +
+        `<span>${formattedSeconds}</span>`;
+}
+
+// Function to create and show the name input modal
+function showNameInputModal() {
+    return new Promise((resolve) => {
+        // Create modal container
+        const modalContainer = document.createElement('div');
+        modalContainer.style.position = 'fixed';
+        modalContainer.style.top = '0';
+        modalContainer.style.left = '0';
+        modalContainer.style.width = '100%';
+        modalContainer.style.height = '100%';
+        modalContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        modalContainer.style.display = 'flex';
+        modalContainer.style.justifyContent = 'center';
+        modalContainer.style.alignItems = 'center';
+        modalContainer.style.zIndex = '9999';
+
+        // Create modal content
+        const modalContent = document.createElement('div');
+        modalContent.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        modalContent.style.padding = '30px';
+        modalContent.style.borderRadius = '15px';
+        modalContent.style.border = '2px solid #ff6600';
+        modalContent.style.boxShadow = '0 0 20px rgba(255, 102, 0, 0.5)';
+        modalContent.style.textAlign = 'center';
+        modalContent.style.maxWidth = '90%';
+        modalContent.style.width = '400px';
+
+        // Add congratulations message
+        const congratsMessage = document.createElement('h2');
+        congratsMessage.textContent = 'Congratulations!';
+        congratsMessage.style.color = '#ff6600';
+        congratsMessage.style.marginBottom = '20px';
+        congratsMessage.style.fontSize = '28px';
+        congratsMessage.style.textShadow = '0 0 10px rgba(255, 102, 0, 0.5)';
+
+        // Add input label
+        const inputLabel = document.createElement('p');
+        inputLabel.textContent = 'Enter your name for the leaderboard:';
+        inputLabel.style.color = '#ffffff';
+        inputLabel.style.marginBottom = '15px';
+        inputLabel.style.fontSize = '18px';
+
+        // Create input field
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.maxLength = '20';
+        input.style.width = '100%';
+        input.style.padding = '12px';
+        input.style.marginBottom = '20px';
+        input.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        input.style.border = '2px solid #ff6600';
+        input.style.borderRadius = '8px';
+        input.style.color = '#ffffff';
+        input.style.fontSize = '18px';
+        input.style.outline = 'none';
+        input.style.transition = 'all 0.3s ease';
+        input.placeholder = 'Your name';
+
+        // Style input focus
+        input.addEventListener('focus', () => {
+            input.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+            input.style.boxShadow = '0 0 10px rgba(255, 102, 0, 0.5)';
+        });
+
+        input.addEventListener('blur', () => {
+            input.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            input.style.boxShadow = 'none';
+        });
+
+        // Create submit button
+        const submitButton = document.createElement('button');
+        submitButton.textContent = 'SUBMIT';
+        submitButton.style.backgroundColor = '#ff6600';
+        submitButton.style.color = 'white';
+        submitButton.style.padding = '12px 30px';
+        submitButton.style.border = 'none';
+        submitButton.style.borderRadius = '25px';
+        submitButton.style.fontSize = '18px';
+        submitButton.style.cursor = 'pointer';
+        submitButton.style.transition = 'all 0.2s ease';
+        submitButton.style.fontWeight = 'bold';
+        submitButton.style.letterSpacing = '1px';
+
+        // Button hover effects
+        submitButton.addEventListener('mouseover', () => {
+            submitButton.style.transform = 'scale(1.05)';
+            submitButton.style.boxShadow = '0 0 15px rgba(255, 102, 0, 0.7)';
+        });
+
+        submitButton.addEventListener('mouseout', () => {
+            submitButton.style.transform = 'scale(1)';
+            submitButton.style.boxShadow = 'none';
+        });
+
+        // Handle form submission
+        const handleSubmit = () => {
+            const name = input.value.trim();
+            if (name) {
+                modalContainer.remove();
+                resolve(name);
+            } else {
+                input.style.border = '2px solid #ff0000';
+                input.style.animation = 'shake 0.5s';
+                setTimeout(() => {
+                    input.style.border = '2px solid #ff6600';
+                    input.style.animation = '';
+                }, 500);
+            }
+        };
+
+        // Add event listeners
+        submitButton.addEventListener('click', handleSubmit);
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleSubmit();
+            }
+        });
+
+        // Assemble modal
+        modalContent.appendChild(congratsMessage);
+        modalContent.appendChild(inputLabel);
+        modalContent.appendChild(input);
+        modalContent.appendChild(submitButton);
+        modalContainer.appendChild(modalContent);
+        document.body.appendChild(modalContainer);
+
+        // Focus input
+        input.focus();
+    });
+}
+
+// Add shake animation for invalid input
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+    }
+`;
+document.head.appendChild(styleSheet);
 
 // Start the game
 init(); 
