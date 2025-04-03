@@ -185,6 +185,7 @@ let arena, ball, playerPaddle, opponentPaddle;
 let ballVelocity = { x: 0, y: 0, z: 0 };
 let lastTimestamp = 0;
 let mousePosition = { x: 0, y: 0 };
+let errorRecoveryAttempts = 0; // Track consecutive error recovery attempts
 
 // Initialize the game
 function init() {
@@ -777,6 +778,52 @@ function updateBall(deltaTime) {
         ball.userData.previousPosition.copy(ball.position);
     }
     
+    // Add stuck detection - track ball position over time
+    if (!ball.userData.stuckDetection) {
+        ball.userData.stuckDetection = {
+            lastPosition: new THREE.Vector3(),
+            stuckTime: 0,
+            lastMovementTime: Date.now()
+        };
+    }
+    
+    // Check if ball has moved significantly
+    const minMovement = 0.5; // Minimum movement threshold
+    const currentPos = ball.position.clone();
+    const lastPos = ball.userData.stuckDetection.lastPosition;
+    const distanceMoved = currentPos.distanceTo(lastPos);
+    
+    if (distanceMoved > minMovement) {
+        // Ball is moving normally, reset stuck timer
+        ball.userData.stuckDetection.lastPosition.copy(currentPos);
+        ball.userData.stuckDetection.stuckTime = 0;
+        ball.userData.stuckDetection.lastMovementTime = Date.now();
+    } else {
+        // Check if ball velocity is non-zero but position isn't changing
+        const hasVelocity = ballVelocity.length() > 0.1;
+        if (hasVelocity) {
+            ball.userData.stuckDetection.stuckTime += deltaTime;
+            
+            // If ball appears stuck for more than 2 seconds with velocity
+            if (ball.userData.stuckDetection.stuckTime > 2) {
+                console.warn("Ball appears stuck! Attempting recovery...");
+                // Force ball reset
+                startCountdown(Math.random() > 0.5, "Restarting Play");
+                ball.userData.stuckDetection.stuckTime = 0;
+                return;
+            }
+        }
+        
+        // Also check for absolute timeout (5 seconds without significant movement)
+        const timeSinceMovement = (Date.now() - ball.userData.stuckDetection.lastMovementTime) / 1000;
+        if (timeSinceMovement > 5) {
+            console.warn("Ball hasn't moved in 5 seconds! Forcing reset...");
+            startCountdown(Math.random() > 0.5, "Restarting Play");
+            ball.userData.stuckDetection.lastMovementTime = Date.now();
+            return;
+        }
+    }
+    
     // Update ball position based on velocity (no gravity in Pong)
     ball.position.x += ballVelocity.x * deltaTime;
     ball.position.y += ballVelocity.y * deltaTime;
@@ -1134,8 +1181,30 @@ function animate(timestamp) {
         console.error("Error in animation loop:", error);
         // Attempt to recover from error by resetting some game state
         try {
+            // Log detailed information for debugging
+            console.error("Ball position:", ball ? [ball.position.x, ball.position.y, ball.position.z] : "N/A");
+            console.error("Ball velocity:", ballVelocity ? [ballVelocity.x, ballVelocity.y, ballVelocity.z] : "N/A");
+            console.error("Game state:", JSON.stringify({
+                started: gameState.started,
+                over: gameState.over,
+                countdown: gameState.countdown.active,
+                scores: gameState.scores
+            }));
+            
             // Ensure game can continue despite errors
             requestAnimationFrame(animate);
+            
+            // More aggressive recovery action - just reset the game state
+            if (errorRecoveryAttempts > 5) {
+                console.warn("Multiple errors detected, attempting full game reset");
+                // Force restart game logic
+                if (gameState.started && !gameState.over) {
+                    gameState.over = true;
+                    createKevinityGameOverScreen();
+                }
+                errorRecoveryAttempts = 0;
+                return;
+            }
             
             // Reset ball if it's causing issues
             if (!gameState.countdown.active) {
@@ -1148,10 +1217,15 @@ function animate(timestamp) {
                 startCountdown(Math.random() > 0.5, "Game reset");
             }
             
+            // Increment error recovery attempts counter
+            errorRecoveryAttempts++;
+            
             // Render what we can
             renderer.render(scene, camera);
         } catch (recoveryError) {
             console.error("Failed to recover from animation error:", recoveryError);
+            // Last resort - try to keep the loop going no matter what
+            requestAnimationFrame(animate);
         }
     }
 }
@@ -2131,11 +2205,37 @@ function normalizeVelocity() {
         ballVelocity.z * ballVelocity.z
     );
     
-    if (speed === 0) return; // Avoid division by zero
+    if (speed === 0) {
+        // If velocity is zero, we need to set a default direction
+        console.warn("Ball velocity was zero in normalizeVelocity! Setting default direction.");
+        // Set a default direction (toward player or opponent randomly)
+        const randomZ = Math.random() > 0.5 ? gameState.currentBallSpeed : -gameState.currentBallSpeed;
+        ballVelocity.x = (Math.random() - 0.5) * gameState.currentBallSpeed * 0.5;
+        ballVelocity.y = (Math.random() - 0.5) * gameState.currentBallSpeed * 0.5;
+        ballVelocity.z = randomZ * 0.8;
+        return;
+    }
+    
+    // Failsafe for NaN velocities
+    if (isNaN(speed) || isNaN(ballVelocity.x) || isNaN(ballVelocity.y) || isNaN(ballVelocity.z)) {
+        console.error("NaN detected in ball velocity! Resetting to default.");
+        ballVelocity.x = 0;
+        ballVelocity.y = 0;
+        ballVelocity.z = -gameState.currentBallSpeed;
+        return;
+    }
 
     ballVelocity.x = (ballVelocity.x / speed) * gameState.currentBallSpeed;
     ballVelocity.y = (ballVelocity.y / speed) * gameState.currentBallSpeed;
     ballVelocity.z = (ballVelocity.z / speed) * gameState.currentBallSpeed;
+    
+    // Final sanity check for invalid values after normalization
+    if (isNaN(ballVelocity.x) || isNaN(ballVelocity.y) || isNaN(ballVelocity.z)) {
+        console.error("NaN detected after normalization! Emergency reset.");
+        ballVelocity.x = 0;
+        ballVelocity.y = 0;
+        ballVelocity.z = -gameState.currentBallSpeed;
+    }
 }
 
 function checkScoring() {
