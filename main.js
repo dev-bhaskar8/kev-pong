@@ -681,11 +681,11 @@ function updateOpponentPaddle() {
             opponentPaddle.userData.targetX = targetX;
             opponentPaddle.userData.targetY = targetY;
             
-            // Calculate base speed - Massively faster for the first guaranteed hit
+            // Calculate base speed - Slightly faster base speed
             const skillBonus = Math.min(2.5, gameState.scores.player * 0.07); // Slightly increased skill bonus cap and scaling
-            const normalBaseMaxSpeed = 1.5 + skillBonus; // Slightly increased base speed from 1.2 to 1.5
+            const normalBaseMaxSpeed = 1.7 + skillBonus; // Increased base speed from 1.5 to 1.7
             // const baseMaxSpeed = isFirstHit ? 100.0 : normalBaseMaxSpeed; // No longer needed due to teleport
-            const baseMaxSpeed = normalBaseMaxSpeed; 
+            const baseMaxSpeed = normalBaseMaxSpeed;
             
             // Apply smooth acceleration with variable maxSpeed based on distance and confidence
             const distX = targetX - opponentPaddle.position.x;
@@ -2074,7 +2074,7 @@ function checkPaddleCollisions() {
         createHitEffect(ball.position.clone(), 0xff5500);
 
         // Increase ball speed slightly after hit
-        gameState.currentBallSpeed += 10; // Increased speed increment from 5 to 10
+        gameState.currentBallSpeed += 15; // Increased speed increment from 10 to 15
         // Optional: Add a max speed cap
         // gameState.currentBallSpeed = Math.min(gameState.currentBallSpeed, BALL_SPEED * 1.5); 
     }
@@ -2110,7 +2110,7 @@ function checkPaddleCollisions() {
         }
 
         // Increase ball speed slightly after hit
-        gameState.currentBallSpeed += 10; // Increased speed increment from 5 to 10
+        gameState.currentBallSpeed += 15; // Increased speed increment from 10 to 15
         // Optional: Add a max speed cap
         // gameState.currentBallSpeed = Math.min(gameState.currentBallSpeed, BALL_SPEED * 1.5);
     }
