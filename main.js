@@ -2269,6 +2269,7 @@ function checkGameOver() {
     if (gameState.scores.player >= gameState.winningScore || 
         gameState.scores.opponent >= gameState.winningScore) {
         gameState.over = true;
+        document.body.classList.remove('game-active'); // Show cursor immediately
         
         // Create and display enhanced game over screen
         createKevinityGameOverScreen();
