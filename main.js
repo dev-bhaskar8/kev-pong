@@ -427,58 +427,84 @@ function createBall() {
 }
 
 function createPaddles() {
-    // Player paddle - clean outline only
-    const paddleGroup = new THREE.Group();
-    
-    // Create base geometry to derive edges from
+    // Player paddle - Glassy mesh + Wireframe outline
     const paddleGeometry = new THREE.BoxGeometry(
         PADDLE_WIDTH, 
         PADDLE_HEIGHT, 
         PADDLE_DEPTH
     );
     
-    // Create edges geometry (just the 12 edges of the box, no diagonals)
-    const edgesGeometry = new THREE.EdgesGeometry(paddleGeometry);
-    const edgesMaterial = new THREE.LineBasicMaterial({
-        color: 0xff8800,
+    // Create glass mesh
+    const playerMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xff8800, // Player color
+        metalness: 0.1,
+        roughness: 0.3,    // Diffused highlights
+        transmission: 0.9, // Glass effect
+        thickness: 0.8,
+        transparent: true,
+        opacity: 0.8,      // Slightly more transparent to see wireframe better
+        ior: 1.5
+    });
+    const playerPaddleMesh = new THREE.Mesh(paddleGeometry, playerMaterial);
+
+    // Create wireframe edges
+    const playerEdgesGeometry = new THREE.EdgesGeometry(paddleGeometry);
+    const playerEdgesMaterial = new THREE.LineBasicMaterial({
+        color: 0xffaa33, // Brighter orange for wireframe
         linewidth: 2
     });
-    
-    const paddleEdges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
-    paddleGroup.add(paddleEdges);
-    
-    // Position the whole paddle
-    paddleGroup.position.set(0, 0, ARENA_LENGTH / 2 - 10);
-    scene.add(paddleGroup);
-    
-    // For convenience in updating position, store the group as playerPaddle
-    playerPaddle = paddleGroup;
+    const playerPaddleEdges = new THREE.LineSegments(playerEdgesGeometry, playerEdgesMaterial);
 
-    // Opponent paddle - clean outline only
-    const opponentPaddleGroup = new THREE.Group();
+    // Group mesh and edges
+    const playerPaddleGroup = new THREE.Group();
+    playerPaddleGroup.add(playerPaddleMesh);
+    playerPaddleGroup.add(playerPaddleEdges);
     
-    // Create base geometry to derive edges from
+    // Position the group
+    playerPaddleGroup.position.set(0, 0, ARENA_LENGTH / 2 - 10);
+    scene.add(playerPaddleGroup);
+    
+    // Store the group as playerPaddle
+    playerPaddle = playerPaddleGroup;
+
+    // Opponent paddle - Glassy mesh + Wireframe outline
     const opponentPaddleGeometry = new THREE.BoxGeometry(
         PADDLE_WIDTH, 
         PADDLE_HEIGHT, 
         PADDLE_DEPTH
     );
     
-    // Create edges geometry (just the 12 edges of the box, no diagonals)
+    // Create glass mesh
+    const opponentMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x88ff00, // Opponent color
+        metalness: 0.1,
+        roughness: 0.3,    // Diffused highlights
+        transmission: 0.9, // Glass effect
+        thickness: 0.8,
+        transparent: true,
+        opacity: 0.8,      // Slightly more transparent to see wireframe better
+        ior: 1.5
+    });
+    const opponentPaddleMesh = new THREE.Mesh(opponentPaddleGeometry, opponentMaterial);
+
+    // Create wireframe edges
     const opponentEdgesGeometry = new THREE.EdgesGeometry(opponentPaddleGeometry);
     const opponentEdgesMaterial = new THREE.LineBasicMaterial({
-        color: 0x88ff00,
+        color: 0xafff66, // Brighter green for wireframe
         linewidth: 2
     });
-    
     const opponentPaddleEdges = new THREE.LineSegments(opponentEdgesGeometry, opponentEdgesMaterial);
+
+    // Group mesh and edges
+    const opponentPaddleGroup = new THREE.Group();
+    opponentPaddleGroup.add(opponentPaddleMesh);
     opponentPaddleGroup.add(opponentPaddleEdges);
-    
-    // Position the whole paddle
+
+    // Position the group
     opponentPaddleGroup.position.set(0, 0, -ARENA_LENGTH / 2 + 10);
     scene.add(opponentPaddleGroup);
     
-    // For convenience in updating position, store the group as opponentPaddle
+    // Store the group as opponentPaddle
     opponentPaddle = opponentPaddleGroup;
 
     // Initialize opponent paddle user data
@@ -487,9 +513,9 @@ function createPaddles() {
         velocityY: 0,
         targetX: 0,
         targetY: 0,
-        lastPrediction: { x: 0, y: 0 }, // Initialize here
+        lastPrediction: { x: 0, y: 0 },
         predictionConfidence: 0,
-        isFirstHitAfterServe: false // Initialize here
+        isFirstHitAfterServe: false
     };
 }
 
@@ -1024,6 +1050,7 @@ function onWindowResize() {
 }
 
 function animate(timestamp) {
+    let justFinishedCountdown = false; // Flag to skip updateBall this frame
     try {
         requestAnimationFrame(animate);
         
@@ -1055,6 +1082,7 @@ function animate(timestamp) {
                     
                     // Reset the ball with proper serve direction
                     resetBall(gameState.countdown.serveToPlayer);
+                    justFinishedCountdown = true; // Set the flag
 
                     // If serving to opponent, set flag for first hit accuracy
                     if (!gameState.countdown.serveToPlayer && opponentPaddle.userData) {
@@ -1078,8 +1106,8 @@ function animate(timestamp) {
             updateOpponentPaddle();
         }
         
-        // Update ball physics (only if not in countdown)
-        if (!gameState.countdown.active) {
+        // Update ball physics (only if not in countdown AND countdown didn't just finish)
+        if (!gameState.countdown.active && !justFinishedCountdown) {
             updateBall(cappedDeltaTime);
         }
         
