@@ -2455,6 +2455,13 @@ function createKevinityGameOverScreen() {
         this.style.transform = 'scale(1.05)';
     };
     
+    // Add event listeners directly to the element
+    restartButtonElement.addEventListener('click', restartGame);
+    restartButtonElement.addEventListener('touchend', (e) => {
+        e.preventDefault(); // Prevent click after touch
+        restartGame();
+    });
+    
     kevinityGameOverScreen.appendChild(restartButtonElement);
     
     // Add visit Kevinity.ai link
@@ -2479,9 +2486,6 @@ function createKevinityGameOverScreen() {
     // Add to game container
     document.getElementById('game-container').appendChild(kevinityGameOverScreen);
     
-    // Update event listener
-    document.getElementById('restart-button').addEventListener('click', restartGame);
-
     // Hide Timer Display
     const timerElement = document.getElementById('timer-display');
     if (timerElement) {
@@ -2672,6 +2676,25 @@ function showNameInputModal() {
         modalContent.style.textAlign = 'center';
         modalContent.style.maxWidth = '90%';
         modalContent.style.width = '400px';
+        modalContent.style.position = 'relative'; // Needed for absolute positioning of close button
+
+        // Add Close Button (X)
+        const closeButton = document.createElement('button');
+        closeButton.innerHTML = '&times;'; // X symbol
+        closeButton.style.position = 'absolute';
+        closeButton.style.top = '10px';
+        closeButton.style.right = '15px';
+        closeButton.style.background = 'none';
+        closeButton.style.border = 'none';
+        closeButton.style.color = '#aaa';
+        closeButton.style.fontSize = '30px';
+        closeButton.style.lineHeight = '1';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.padding = '0';
+        closeButton.style.transition = 'color 0.2s ease';
+        closeButton.onmouseover = () => { closeButton.style.color = '#fff'; };
+        closeButton.onmouseout = () => { closeButton.style.color = '#aaa'; };
+        modalContent.appendChild(closeButton);
 
         // Add congratulations message
         const congratsMessage = document.createElement('h2');
@@ -2763,6 +2786,21 @@ function showNameInputModal() {
                 handleSubmit();
             }
         });
+
+        // Add touchend listener for submit button (mobile reliability)
+        submitButton.addEventListener('touchend', (e) => {
+             e.preventDefault(); // Prevent potential double firing
+             handleSubmit();
+        });
+
+        // Add event listeners for close button
+        const handleClose = (e) => {
+            e.preventDefault();
+            modalContainer.remove();
+            resolve(null); // Resolve with null on close
+        };
+        closeButton.addEventListener('click', handleClose);
+        closeButton.addEventListener('touchend', handleClose);
 
         // Assemble modal
         modalContent.appendChild(congratsMessage);
